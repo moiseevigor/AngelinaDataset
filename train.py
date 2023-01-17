@@ -67,9 +67,8 @@ class RetinaNetDataset(Dataset):
                 for shape in annotation["shapes"]:
                     self.labels.append(shape["label"])
 
-        self.label_to_int = {label: i for i, label in enumerate(set(self.labels))}
+        self.label_to_int = {label: i for i, label in enumerate(sorted(set(self.labels)))}
         self.int_to_label = {i: label for label, i in self.label_to_int.items()}
-        
 
     def __len__(self):
         return len(self.annotation_files)
@@ -104,10 +103,10 @@ class RetinaNetDataset(Dataset):
         if self.transform:
             imageTensor = self.transform(image)
 
-        if imageTensor.size() != torch.Size([3, 1376, 1024]):
-            # TODO check what is cropped
-            image = image.crop([0, 0, 1024, 1376])
-            imageTensor = self.transform(image)
+        # if imageTensor.size() != torch.Size([3, 1376, 1024]):
+        #     # TODO check what is cropped
+        #     image = image.crop([0, 0, 1024, 1376])
+        #     imageTensor = self.transform(image)
 
         return imageTensor, targets
 
@@ -121,21 +120,30 @@ def labelbox_collate_fn(batch):
 # dataloader = DataLoader(dataset, batch_size=4, shuffle=True, num_workers=4)
 
 # usage
-train_txt = '/app/books/train.txt'
-with open(train_txt, 'r') as file:
-    annotation_files = ['/app/books/' + line.strip().replace('.jpg', '.json') for line in file.readlines()]
+annotation_files = []
+for train_txt in [
+    '/app/books/train.txt',
+    # '/app/not_braille/train.txt',
+    '/app/handwritten/train.txt',
+    '/app/uploaded/test2.txt',
+]:
+    with open(train_txt, 'r') as file:
+        annotation_files.extend([os.path.join(os.path.dirname(train_txt), line.strip().replace('.jpg', '.json')) for line in file.readlines()])
 
 # dataset = LabelboxDataset(annotation_files)
 # dataloader = DataLoader(dataset, batch_size=4, shuffle=True, num_workers=4)
 
-transform = transforms.Compose([transforms.ToTensor()])
+transform = transforms.Compose([
+    transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5),
+    transforms.ToTensor()
+])
 dataset = RetinaNetDataset(annotation_files, transform=transform)
 print(dataset.label_to_int)
 print(dataset.int_to_label)
 
 
 # define the dataloader
-dataloader = DataLoader(dataset, batch_size=2, shuffle=True, num_workers=2, pin_memory=True, collate_fn=labelbox_collate_fn)
+dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=2, pin_memory=True, collate_fn=labelbox_collate_fn)
 
 # for i, data in enumerate(dataloader):
 #     print(data)
@@ -201,13 +209,11 @@ model = models.detection.retinanet_resnet50_fpn_v2(
 )
 model = model.to(device)
 
-import pdb; pdb.set_trace()
-
 # loss_fn = FocalLoss()
 optimizer = Adam(model.parameters(), lr=1e-4)
 
 # define the number of training steps
-num_steps = 10
+num_steps = 40
 
 model.train()
 for step in range(num_steps):
@@ -236,5 +242,4 @@ for step in range(num_steps):
         print('Step {}, Loss: {}'.format(step, losses))
 
 # save the model
-torch.save(model.state_dict(), 'model.pth')
-
+torch.save(model.state_dict(), 'model-3.pth')
