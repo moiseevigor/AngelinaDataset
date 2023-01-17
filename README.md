@@ -27,3 +27,24 @@ Some special symbols can be labeled in several ways. See [labeling_synonyms](htt
 Various tools for handling labels can be found at [label_tools.py](https://github.com/IlyaOvodov/AngelinaReader/blob/master/braille_utils/label_tools.py) file.
 Reading function for this dataset is implemented in [read_LabelMe_annotation](https://github.com/IlyaOvodov/AngelinaReader/blob/328b0e0d30353d76ec06cde8560a876da5c46ab7/data_utils/data.py#L325) function.
 Implementation of PyTorch Dataset is [here](https://github.com/IlyaOvodov/AngelinaReader/blob/328b0e0d30353d76ec06cde8560a876da5c46ab7/data_utils/data.py#L171).         
+
+------------------------------
+
+X11 
+
+```
+xhost local:root
+```
+
+run interactively 
+
+```
+docker run --rm --gpus all --ipc=host -it --env="DISPLAY" -v "/tmp/.X11-unix:/tmp/.X11-unix:rw" -v $PWD:/app braille python /app/train.py
+```
+
+Links
+- infer on retinanet https://stackabuse.com/retinanet-object-detection-with-pytorch-and-torchvision/
+- train retinanet https://colab.research.google.com/github/benihime91/pytorch_retinanet/blob/master/demo.ipynb
+- train retinanet https://debuggercafe.com/object-detection-using-retinanet-with-pytorch-and-deep-learning/
+- pretrained retinanet https://github.com/pytorch/vision/issues/3442
+- fine tunning https://pytorch.org/tutorials/intermediate/torchvision_tutorial.html
