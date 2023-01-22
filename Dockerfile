@@ -14,7 +14,7 @@ RUN pip install tensorboardX matplotlib
 RUN python -c "import torchvision; torchvision.models.detection.retinanet_resnet50_fpn(pretrained=True)"
 RUN python -c "import torchvision; torchvision.models.detection.retinanet_resnet50_fpn_v2(pretrained=True)"
 RUN python -c "import torchvision; torchvision.models.resnet50(pretrained=True)"
-
+RUN pip install torch-lr-finder
 
 # Copy the code
 # COPY requirements.txt /app/

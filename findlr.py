@@ -28,8 +28,7 @@ int_to_label = {0: '!', 1: '##', 2: '(', 3: '()', 4: ')', 5: '*', 6: '+', 7: ','
 labels = sorted(set(int_to_label.values()))
 print('labels', labels)
 
-# device = 'cuda' if torch.cuda.is_available() else 'cpu'
-device = 'cpu'
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class RetinaNetDataset(Dataset):
     def __init__(self, train_annotation_files, transform=None, labels=None):
@@ -129,7 +128,7 @@ def plot_image(image, prediction):
 annotation_files = []
 for filepath in [
     '/app/books/train.txt',
-    '/app/not_braille/train.txt',
+    # '/app/not_braille/train.txt',
     '/app/handwritten/train.txt',
     '/app/uploaded/test2.txt',
     '/app/books/val.txt',
@@ -139,7 +138,11 @@ for filepath in [
         annotation_files.extend([os.path.join(os.path.dirname(filepath), line.strip().replace('.jpg', '.json')) for line in file.readlines()])
 
 transform = transforms.Compose([
-    transforms.ToTensor()
+    transforms.ToTensor(),
+    transforms.Normalize(
+        mean=[0.5749533646009656, 0.5758692075743113, 0.5564374772810018], 
+        std=[0.12675546510063618, 0.13864833881922706, 0.14966126335877825]
+    )
 ])
 dataset = RetinaNetDataset(annotation_files, transform=transform, labels=labels)
 print('label_to_int:', dataset.label_to_int)
@@ -205,12 +208,11 @@ def compute_acc_iou(model, dataloader, threshold=0.5):
                 if iou.max() > threshold and best_candidate_label == targets[0]['labels'][i] and best_candidate_score > threshold:
                     correct += 1
                 elif iou.max() > threshold and best_candidate_score>0.4:
-                    print(best_candidate_label.item(), targets[0]['labels'][i].item(), dataset.int_to_label[targets[0]['labels'][i].item()], best_candidate_score.item())
-                    # plot_image(images[0].cpu(), {
-                    #     'boxes': [predicted_bboxes[best_candidate_index]],
-                    #     'labels': [predicted_labels[best_candidate_index]],
-                    #     'scores': [predicted_scores[best_candidate_index]]
-                    # })
+                    plot_image(images[0].cpu(), {
+                        'boxes': [predicted_bboxes[best_candidate_index]],
+                        'labels': [predicted_labels[best_candidate_index]],
+                        'scores': [predicted_scores[best_candidate_index]]
+                    })
             
 
     acc = correct / total
@@ -220,28 +222,84 @@ def compute_acc_iou(model, dataloader, threshold=0.5):
 
 # define model, loss function and optimizer
 num_classes = len(set(dataset.labels))
-model = models.detection.retinanet_resnet50_fpn_v2(
-    weights=None,
-    weights_backbone=models.ResNet50_Weights,
-    num_classes=num_classes
-)
+for lr in [0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005, 0.01]:
+    model = models.detection.retinanet_resnet50_fpn_v2(
+        weights=None,
+        weights_backbone=models.ResNet50_Weights,
+        num_classes=num_classes
+    )
 
-# model_name='model-3.pth'
-# model_name='model-6-0.823.pth'
-# model_name='model-7-0.778.pth'
-# model_name='model-8-0.847.pth'
-model_name='model-9-0.862.pth'
+    # model_name='model-3.pth'lr_finder
+    # model_name='model-6-0.823.pth'
+    # model_name='model-7-0.778.pth'
+    # model_name='model-8-0.847.pth'
+    model_name='model-9-0.862.pth'
 
-model.load_state_dict(torch.load('weights/' + model_name))
-model = model.to(device)
+    # model.load_state_dict(torch.load('weights/' + model_name))
+    model = model.to(device)
 
-# Validation
-model.eval()
-with torch.no_grad():
-    val_acc, val_iou = compute_acc_iou(model, dataloader)
+    optimizer = Adam(model.parameters(), lr=lr)
 
-print(
-    model_name,
-    'val_acc', val_acc, 
-    'val_iou', val_iou.item()
-)
+    # Validation
+    # model.eval()
+    # with torch.no_grad():
+    #     val_acc, val_iou = compute_acc_iou(model, dataloader)
+
+    # print(
+    #     model_name,
+    #     'val_acc', val_acc, 
+    #     'val_iou', val_iou.item()
+    # )
+
+    model.train()
+
+    for i in range(0,3):
+        tot_loss = 0
+        for iter, data in enumerate(dataloader):
+            images, targets = data
+
+            for i, im in enumerate(images):
+                images[i] = images[i].to(device)
+                targets[i]['boxes'] = targets[i]['boxes'].to(device)
+                targets[i]['labels'] = targets[i]['labels'].to(device)
+
+            # forward pass
+            logits = model(images, targets)
+            # backward pass and optimization
+            optimizer.zero_grad()
+            losses = sum(loss for loss in logits.values())
+
+            losses.backward()
+            optimizer.step()
+
+            tot_loss += losses.item()
+
+        print(lr, tot_loss)
+
+# 1e-05 320.67156541347504
+# 1e-05 235.6819474697113
+# 1e-05 185.66882854700089
+
+# 5e-05 259.29261910915375
+# 5e-05 138.56063218414783
+# 5e-05 90.22402086853981
+
+# 0.0001 272.3191775083542
+# 0.0001 141.28125293552876
+# 0.0001 83.54224193096161
+
+# 0.0005 320.20940947532654
+# 0.0005 283.61090886592865
+# 0.0005 242.45189040899277
+
+# 0.001 340.76851737499237
+# 0.001 283.87975734472275
+# 0.001 226.93494874238968
+
+# 0.005 773.3471522331238
+# 0.005 307.5432842373848
+# 0.005 287.8097814321518
+
+# 0.01 1578.342949271202
+# 0.01 372.29891085624695
+# 0.01 416.11539459228516

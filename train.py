@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from PIL import Image
 from torch.utils.data.dataloader import default_collate
+import argparse
 
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -13,9 +14,14 @@ from torchvision import transforms
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
 
-num_experiment = 9
+# Define the argument parser
+parser = argparse.ArgumentParser(description='Load model weights')
+parser.add_argument('--weights', required=False, help='Path to the model weights file')
+args = parser.parse_args()
+
+num_experiment = 10
 # Create a SummaryWriter object
-writer = SummaryWriter(f'/app/experiments/retinanet/adam/exp-{num_experiment}-resnet50-lr-1e-4-image-norm')
+writer = SummaryWriter(f'/app/experiments/retinanet/adam/exp-{num_experiment}-resnet50-lr-1e-5-image-norm-finetune')
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -128,7 +134,7 @@ transform = transforms.Compose([
     transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5),
     transforms.RandomAdjustSharpness(sharpness_factor=1, p=0.1),
     transforms.RandomGrayscale(p=0.1),
-    transforms.ToTensor()
+    transforms.ToTensor(),
     transforms.Normalize(
         mean=[0.5749533646009656, 0.5758692075743113, 0.5564374772810018], 
         std=[0.12675546510063618, 0.13864833881922706, 0.14966126335877825]
@@ -257,9 +263,13 @@ model = models.detection.retinanet_resnet50_fpn_v2(
     weights_backbone=models.ResNet50_Weights,
     num_classes=num_classes
 )
+
+if args.weights is not None:
+    model.load_state_dict(torch.load(args.weights))
+
 model = model.to(device)
 
-optimizer = Adam(model.parameters(), lr=1e-4)
+optimizer = Adam(model.parameters(), lr=1e-5)
 
 # define the number of training steps
 num_epochs = 50
@@ -290,8 +300,6 @@ for epoch in range(num_epochs):
 
         # forward pass
         logits = model(images, targets)
-        # print(iter, logits)
-        # loss = loss_fn(logits, targets)
         losses = sum(loss for loss in logits.values())
 
         # backward pass and optimization
@@ -326,7 +334,7 @@ for epoch in range(num_epochs):
 
     # save best checkpoint the model
     if val_accuracy < val_acc:
-        torch.save(model.state_dict(), f'model-{num_experiment}-{val_acc:.3f}.pth')
-        if os.path.exists(f'model-{num_experiment}-{val_accuracy:.3f}.pth'):
-            os.remove(f'model-{num_experiment}-{val_accuracy:.3f}.pth')     
+        torch.save(model.state_dict(), f'weights/model-{num_experiment}-{val_acc:.3f}.pth')
+        if os.path.exists(f'weights/model-{num_experiment}-{val_accuracy:.3f}.pth'):
+            os.remove(f'weights/model-{num_experiment}-{val_accuracy:.3f}.pth')     
         val_accuracy = val_acc

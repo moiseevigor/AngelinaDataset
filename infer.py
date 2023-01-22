@@ -126,8 +126,6 @@ model.load_state_dict(torch.load('model-3.pth'))
 
 # Put the model in inference mode
 model.eval()
-# Get the transforms for the model's weights
-# preprocess = weights.transforms()
 
 # Define multiple transforms
 transform = transforms.Compose([transforms.ToTensor()])
