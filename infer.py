@@ -11,13 +11,17 @@ from matplotlib.patches import Rectangle
 import matplotlib.pyplot as plt
 import pprint
 
-import requests
 # image = Image.open("/app/books/chudo_derevo_redmi/IMG_20190715_112912.labeled.jpg")
 # image = Image.open("/app/books/chudo_derevo_redmi/IMG_20190715_113048.labeled.jpg")
 # image = Image.open("/app/test/foto-braille-batch-1/5F804152-AF64-48EA-9E0D-15476EC82A56.JPG")
 # image = Image.open("/app/test/foto-braille-batch-2/8A2551D7-745F-4517-B401-F5C43D3308D4.JPG")
 # image = Image.open("/app/test/foto-braille-batch-1/18B9ABA9-9D54-462B-8D85-88646D0498F2.JPG")
-image = Image.open("/app/test/2.png")
+# image = Image.open("/app/test/2.png")
+# image = Image.open("/app/DSBI/data/Fundamentals of Massage/FM+1.jpg")
+# image = Image.open("/app/DSBI/data/Ordinary Printed Document/OPD+1.jpg")
+# image = Image.open("/app/DSBI/data/Shaver Yang Fengting/SYF+3.jpg")
+# image = Image.open("/app/DSBI/data/The Second Volume of Ninth Grade Chinese Book 1/SVNGCB1+1.jpg")
+image = Image.open("/app/DSBI/data/The Second Volume of Ninth Grade Chinese Book 1/SVNGCB1+2.jpg")
 
 # model 1, 83
 # label_to_int = {'б': 0, 'с': 1, 's': 2, '+': 3, '?': 4, 'ю': 5, '=': 6, '0': 7, 'д': 8, '.': 9, 'ь': 10, '~46': 11, '()': 12, ':': 13, 'k': 14, '4': 15, '~4': 16, 'м': 17, 't': 18, 'm': 19, 'ы': 20, 'ф': 21, '1': 22, '>>': 23, 'и': 24, 'е': 25, 'г': 26, '{': 27, 'l': 28, '6': 29, 'у': 30, 'я': 31, 'о': 32, 'o': 33, 'ё': 34, 'т': 35, '/4': 36, ')': 37, '-': 38, 'e': 39, 'z': 40, '!': 41, '§': 42, '3': 43, 'а': 44, '»': 45, 'a': 46, 'n': 47, '«': 48, 'ъ': 49, 'к': 50, 'XX': 51, 'щ': 52, '7': 53, 'q': 54, 'л': 55, 'в': 56, '8': 57, 'п': 58, ';': 59, 'р': 60, '5': 61, 'э': 62, '9': 63, '(': 64, '2': 65, 'й': 66, 'ж': 67, ',': 68, 'ч': 69, '|': 70, 'w': 71, 'ц': 72, 'х': 73, 'н': 74, 'ш': 75, '##': 76, '~3': 77, 'd': 78, '}': 79, '/1': 80, 'з': 81, 'CC': 82}
@@ -117,7 +121,7 @@ def russian_to_italian(text):
     return ''.join(RUSSIAN_TO_ITALIAN.get(c, c) for c in text)
 
 
-model = retinanet_resnet50_fpn_v2(num_classes=116, score_thresh=0.55)
+model = retinanet_resnet50_fpn_v2(num_classes=116, score_thresh=0.15)
 model.load_state_dict(torch.load('model-3.pth'))
 
 # Put the model in inference mode
