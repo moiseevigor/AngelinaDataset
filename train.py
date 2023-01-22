@@ -1,4 +1,4 @@
-import os, json, pprint
+import os, json, pprint, copy
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from PIL import Image
@@ -19,12 +19,15 @@ writer = SummaryWriter(f'/app/experiments/retinanet/adam/exp-1-resnet50-lr-1e-5'
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class RetinaNetDataset(Dataset):
-    def __init__(self, train_annotation_files, transform=None):
+    def __init__(self, train_annotation_files, transform=None, labels=None):
         self.transform = transform
         self.train_annotation_files = train_annotation_files
         self.annotations = []
+        self.set_labels = labels is not None
         self.labels = []
-
+        if self.set_labels:
+            self.labels = copy.deepcopy(labels)
+        
         for json_file in self.train_annotation_files:
             with open(json_file, 'r') as f:
                 annotation = json.load(f)
@@ -32,8 +35,9 @@ class RetinaNetDataset(Dataset):
                 self.annotations.append(annotation)
 
                 # Extract label
-                for shape in annotation["shapes"]:
-                    self.labels.append(shape["label"])
+                if not self.set_labels:
+                    for shape in annotation["shapes"]:
+                        self.labels.append(shape["label"])
 
         self.label_to_int = {label: i for i, label in enumerate(sorted(set(self.labels)))}
         self.int_to_label = {i: label for label, i in self.label_to_int.items()}
@@ -118,20 +122,17 @@ for filepath in [
 #     transforms.Lambda(lambda img, bboxes: (img, bbox_transform(bboxes, rotation_transform))),
 # ])
 
+# define the train_dataloader
 transform = transforms.Compose([
     transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5),
     transforms.RandomAdjustSharpness(sharpness_factor=1, p=0.1),
     transforms.RandomGrayscale(p=0.1),
     transforms.ToTensor()
 ])
-
-train_dataset = RetinaNetDataset(train_annotation_files, transform=transform)
-train_dataset.label_to_int = dataset.label_to_int
-train_dataset.int_to_label = dataset.int_to_label
-
-# define the train_dataloader
+train_dataset = RetinaNetDataset(train_annotation_files, transform=transform, labels=dataset.labels)
 train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=2, pin_memory=True, collate_fn=labelbox_collate_fn)
 
+# define the train_dataloader
 test_annotation_files = []
 for filepath in [
     '/app/books/val.txt',
@@ -142,9 +143,7 @@ for filepath in [
     with open(filepath, 'r') as file:
         test_annotation_files.extend([os.path.join(os.path.dirname(filepath), line.strip().replace('.jpg', '.json')) for line in file.readlines()])
 
-test_dataset = RetinaNetDataset(test_annotation_files, transform=transform)
-test_dataset.label_to_int = dataset.label_to_int
-test_dataset.int_to_label = dataset.int_to_label
+test_dataset = RetinaNetDataset(test_annotation_files, transform=transform, labels=dataset.labels)
 test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=True, num_workers=2, pin_memory=True, collate_fn=labelbox_collate_fn)
 
 # for i, data in enumerate(train_dataloader):
@@ -232,6 +231,8 @@ def compute_acc_iou(model, dataloader, threshold=0.5):
             for i in range(len(targets[0]['boxes'])):
                 # find the best candidate for targets['boxes'] among predicted_bboxes
                 iou = bbox_iou(predicted_bboxes, targets[0]['boxes'][i])
+                if len(iou) <= 0: continue
+
                 best_candidate_index = iou.argmax()
                 best_candidate_label = predicted_labels[best_candidate_index]
                 best_candidate_score = predicted_scores[best_candidate_index]
@@ -259,7 +260,9 @@ optimizer = Adam(model.parameters(), lr=1e-5)
 # define the number of training steps
 num_epochs = 50
 
-model.train()
+# define validation accuracy
+val_accuracy = 0 
+
 for epoch in range(num_epochs):
     # Initialize a progress bar
     progress_bar = tqdm(total=len(train_dataloader), desc=f'Epoch {epoch+1}/{num_epochs}')
@@ -309,5 +312,9 @@ for epoch in range(num_epochs):
     writer.add_scalar('IoU/train', train_iou, epoch)
     writer.add_scalar('IoU/val', val_iou, epoch)
 
-# save the model
-torch.save(model.state_dict(), 'model-6.pth')
+    # save best checkpoint the model
+    if val_accuracy < val_acc:
+        torch.save(model.state_dict(), f'model-6-{val_acc}.pth')
+        if os.path.exists(f'model-6-{val_accuracy}.pth'):
+            os.remove(f'model-6-{val_accuracy}.pth')     
+        val_accuracy = val_acc
