@@ -13,9 +13,9 @@ from torchvision import transforms
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
 
-num_experiment = 8
+num_experiment = 9
 # Create a SummaryWriter object
-writer = SummaryWriter(f'/app/experiments/retinanet/adam/exp-{num_experiment}-resnet50-lr-1e-4')
+writer = SummaryWriter(f'/app/experiments/retinanet/adam/exp-{num_experiment}-resnet50-lr-1e-4-image-norm')
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -129,6 +129,10 @@ transform = transforms.Compose([
     transforms.RandomAdjustSharpness(sharpness_factor=1, p=0.1),
     transforms.RandomGrayscale(p=0.1),
     transforms.ToTensor()
+    transforms.Normalize(
+        mean=[0.5749533646009656, 0.5758692075743113, 0.5564374772810018], 
+        std=[0.12675546510063618, 0.13864833881922706, 0.14966126335877825]
+    )
 ])
 train_dataset = RetinaNetDataset(train_annotation_files, transform=transform, labels=dataset.labels)
 train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=2, pin_memory=True, collate_fn=labelbox_collate_fn)
