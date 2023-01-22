@@ -5,3 +5,5 @@ pseudo*/
 *.marked.rev.jpg
 *.marked.rev.txt
 *.protocol.txt
+test
+weights
