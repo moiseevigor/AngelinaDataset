@@ -13,9 +13,9 @@ from torchvision import transforms
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
 
-num_experiment = 7
+num_experiment = 8
 # Create a SummaryWriter object
-writer = SummaryWriter(f'/app/experiments/retinanet/adam/exp-{num_experiment}-resnet50-lr-1e-5-background')
+writer = SummaryWriter(f'/app/experiments/retinanet/adam/exp-{num_experiment}-resnet50-lr-1e-4')
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -103,7 +103,7 @@ print('int_to_label:', dataset.int_to_label)
 train_annotation_files = []
 for filepath in [
     '/app/books/train.txt',
-    '/app/not_braille/train.txt',
+    # '/app/not_braille/train.txt',
     '/app/handwritten/train.txt',
     '/app/uploaded/test2.txt',
 ]:
@@ -255,8 +255,7 @@ model = models.detection.retinanet_resnet50_fpn_v2(
 )
 model = model.to(device)
 
-# loss_fn = FocalLoss()
-optimizer = Adam(model.parameters(), lr=1e-5)
+optimizer = Adam(model.parameters(), lr=1e-4)
 
 # define the number of training steps
 num_epochs = 50
@@ -275,11 +274,12 @@ for epoch in range(num_epochs):
         for i, im in enumerate(images):
             images[i] = images[i].to(device)
 
-            if len(targets[i]['boxes']) == 0:
-                targets[i]['boxes'] = torch.tensor([[0,0,0.1,0.1]], dtype=torch.float32)
+            # background
+            # if len(targets[i]['boxes']) == 0:
+            #     targets[i]['boxes'] = torch.tensor([[0,0,0.1,0.1]], dtype=torch.float32)
 
-            if len(targets[i]['labels']) == 0:
-                targets[i]['labels'] = torch.tensor([[train_dataset.label_to_int['background']]], dtype=torch.long)
+            # if len(targets[i]['labels']) == 0:
+            #     targets[i]['labels'] = torch.tensor([[train_dataset.label_to_int['background']]], dtype=torch.long)
 
             targets[i]['boxes'] = targets[i]['boxes'].to(device)
             targets[i]['labels'] = targets[i]['labels'].to(device)
