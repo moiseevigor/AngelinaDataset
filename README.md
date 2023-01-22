@@ -48,3 +48,4 @@ Links
 - train retinanet https://debuggercafe.com/object-detection-using-retinanet-with-pytorch-and-deep-learning/
 - pretrained retinanet https://github.com/pytorch/vision/issues/3442
 - fine tunning https://pytorch.org/tutorials/intermediate/torchvision_tutorial.html
+- https://towardsdatascience.com/review-retinanet-focal-loss-object-detection-38fba6afabe4
