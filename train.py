@@ -19,9 +19,9 @@ parser = argparse.ArgumentParser(description='Load model weights')
 parser.add_argument('--weights', required=False, help='Path to the model weights file')
 args = parser.parse_args()
 
-num_experiment = 10
+num_experiment = 14
 # Create a SummaryWriter object
-writer = SummaryWriter(f'/app/experiments/retinanet/adam/exp-{num_experiment}-resnet50-lr-1e-5-image-norm-finetune')
+writer = SummaryWriter(f'/app/experiments/retinanet/sgd/exp-{num_experiment}-resnet50-lr-1e-4-image-norm')
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -134,6 +134,7 @@ transform = transforms.Compose([
     transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5),
     transforms.RandomAdjustSharpness(sharpness_factor=1, p=0.1),
     transforms.RandomGrayscale(p=0.1),
+    # transforms.RandomResizedCrop((1376, 1024), scale=(0.08, 1.0), ratio=(0.75, 1.3333333333333333)),
     transforms.ToTensor(),
     transforms.Normalize(
         mean=[0.5749533646009656, 0.5758692075743113, 0.5564374772810018], 
@@ -178,9 +179,16 @@ test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=True, num_worke
 # from torchvision.transforms.functional import to_pil_image
 
 # # example usage
-# for i in range(10): #len(train_dataset)):
+# for i in range(100,200): #len(train_dataset)):
 #     sample = train_dataset[i]
+
+#     mean=[0.5749533646009656, 0.5758692075743113, 0.5564374772810018]
+#     std=[0.12675546510063618, 0.13864833881922706, 0.14966126335877825]
 #     image = sample[0]
+#     mean = torch.tensor(mean).view(-1, 1, 1)
+#     std = torch.tensor(std).view(-1, 1, 1)
+#     image = image * std + mean
+
 #     shapes = sample[1]
 
 #     # Create figure and axes
@@ -269,7 +277,9 @@ if args.weights is not None:
 
 model = model.to(device)
 
-optimizer = Adam(model.parameters(), lr=1e-5)
+# optimizer = Adam(model.parameters(), lr=1e-5)
+# optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5, weight_decay=0.0001)
+optimizer = torch.optim.SGD(model.parameters(), lr=1e-4, momentum=0.9, weight_decay=1e-4)
 
 # define the number of training steps
 num_epochs = 50
