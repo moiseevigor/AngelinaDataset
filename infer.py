@@ -22,8 +22,9 @@ import pprint
 # image = Image.open("/app/DSBI/data/The Second Volume of Ninth Grade Chinese Book 1/SVNGCB1+2.jpg")
 # image = Image.open("/app/test/IMG_1969.jpg")
 # image = Image.open("/app/test/pagina_braille_fotografata_lowres.jpg")
-image = Image.open("/app/test/pagina_braille_scannerizzata_1.jpg")
+# image = Image.open("/app/test/pagina_braille_scannerizzata_1.jpg")
 # image = Image.open("/app/test/pagina_braille_scannerizzata_2.jpeg")
+image = Image.open("/app/test/braille.png")
 
 
 # model 1, 83

@@ -19,9 +19,9 @@ parser = argparse.ArgumentParser(description='Load model weights')
 parser.add_argument('--weights', required=False, help='Path to the model weights file')
 args = parser.parse_args()
 
-num_experiment = 14
+num_experiment = 16
 # Create a SummaryWriter object
-writer = SummaryWriter(f'/app/experiments/retinanet/sgd/exp-{num_experiment}-resnet50-lr-1e-4-image-norm')
+writer = SummaryWriter(f'/app/experiments/retinanet/iadamw/exp-{num_experiment}-resnet50-onecyclelr-image-norm')
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -278,14 +278,31 @@ if args.weights is not None:
 model = model.to(device)
 
 # optimizer = Adam(model.parameters(), lr=1e-5)
-# optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5, weight_decay=0.0001)
-optimizer = torch.optim.SGD(model.parameters(), lr=1e-4, momentum=0.9, weight_decay=1e-4)
+optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5, weight_decay=0.0001)
+# optimizer = torch.optim.SGD(model.parameters(), lr=1e-5, momentum=0.5, weight_decay=1e-4)
 
 # define the number of training steps
 num_epochs = 50
 
 # define validation accuracy
 val_accuracy = 0 
+
+# Define the learning rate scheduler
+scheduler = torch.optim.lr_scheduler.OneCycleLR(
+    optimizer,
+    max_lr=0.001,
+    # total_steps=batch_size*num_epochs,
+    epochs=num_epochs,
+    steps_per_epoch=len(train_dataloader),
+    pct_start=0.125,
+    anneal_strategy='linear',
+    cycle_momentum=True,
+    base_momentum=0.85,
+    max_momentum=0.95,
+    div_factor=10,
+    final_div_factor=10.0,
+    three_phase=True
+)
 
 for epoch in range(num_epochs):
     # Initialize a progress bar
@@ -317,8 +334,12 @@ for epoch in range(num_epochs):
         losses.backward()
         optimizer.step()
 
+        # Step the learning rate scheduler
+        scheduler.step()
+        lr = scheduler.get_last_lr()
+
         # Update the progress bar
-        progress_bar.set_postfix(train_loss=losses.item())
+        progress_bar.set_postfix(train_loss=losses.item(), lr=lr[0])
         progress_bar.update()
 
     # Validation
@@ -330,6 +351,7 @@ for epoch in range(num_epochs):
     # Update the progress bar
     progress_bar.set_postfix(
         train_loss=losses.item(), 
+        lr=lr[0],
         train_acc=train_acc, 
         train_iou=train_iou.item(),
         val_acc=val_acc, 

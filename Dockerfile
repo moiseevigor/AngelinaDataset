@@ -15,6 +15,11 @@ RUN python -c "import torchvision; torchvision.models.detection.retinanet_resnet
 RUN python -c "import torchvision; torchvision.models.detection.retinanet_resnet50_fpn_v2(pretrained=True)"
 RUN python -c "import torchvision; torchvision.models.resnet50(pretrained=True)"
 RUN pip install torch-lr-finder
+# RUN apt-get update && echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections && apt-get install -y ttf-mscorefonts-installer
+RUN apt install -y fonts-dejavu
+
+
+# RUN pip install pybraille reportlab
 
 # Copy the code
 # COPY requirements.txt /app/
