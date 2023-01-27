@@ -4,6 +4,7 @@ from matplotlib.patches import Rectangle
 from torchvision.transforms.functional import to_pil_image
 from PIL import Image
 from torch.utils.data.dataloader import default_collate
+import torchvision.ops as ops
 
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -30,6 +31,11 @@ print('labels', labels)
 
 # device = 'cuda' if torch.cuda.is_available() else 'cpu'
 device = 'cpu'
+
+mean=[0.5749533646009656, 0.5758692075743113, 0.5564374772810018]
+std=[0.12675546510063618, 0.13864833881922706, 0.14966126335877825]
+mean = torch.tensor(mean).view(-1, 1, 1)
+std = torch.tensor(std).view(-1, 1, 1)
 
 class RetinaNetDataset(Dataset):
     def __init__(self, train_annotation_files, transform=None, labels=None):
@@ -77,7 +83,8 @@ class RetinaNetDataset(Dataset):
 
         return image, {
             'boxes': torch.tensor(boxes),
-            'labels': torch.tensor(labels)
+            'labels': torch.tensor(labels),
+            'filename': annotation["imagePath"]
         }
 
     def __getitem__(self, idx):
@@ -96,15 +103,13 @@ def labelbox_collate_fn(batch):
     targets = [item[1] for item in batch]
     return images, targets
 
-def plot_image(image, prediction):
+def plot_image(ax, plt, prediction, is_gt=True):
     # Get the boxes, labels, and scores from the prediction results
     boxes = prediction["boxes"]
     labels = prediction["labels"]
-    scores = prediction["scores"]
+    scores = prediction["scores"] if "scores" in prediction else torch.ones(labels.size())
 
-    # Create a figure and axes
-    fig, ax = plt.subplots(1)
-    ax.imshow(to_pil_image(image))
+    edge_color = 'lightgreen' if is_gt else 'r'
 
     # Iterate over the boxes, labels, and scores
     for box, label, score in zip(boxes, labels, scores):
@@ -112,7 +117,7 @@ def plot_image(image, prediction):
         xmin, ymin, xmax, ymax = box.detach().cpu().numpy()
 
         # Create a rectangle patch
-        rect = Rectangle((xmin, ymin), xmax - xmin, ymax - ymin, linewidth=1, edgecolor='r', facecolor='none')
+        rect = Rectangle((xmin, ymin), xmax - xmin, ymax - ymin, linewidth=1, edgecolor=edge_color, facecolor='none')
 
         # Add the patch to the axes
         ax.add_patch(rect)
@@ -120,66 +125,77 @@ def plot_image(image, prediction):
         label_text = int_to_label[int(label.detach().cpu().numpy())]
 
         # Add the label and score as text
-        plt.text(xmin, ymin-10, f"{label_text}: {score:0.2f}", fontsize=10, color='r')
-        # plt.text(xmin, ymin-10, f"{label_text}", fontsize=10, color='r')
+        if is_gt:
+            plt.text(xmin, ymin-5, f"{label_text}", fontsize=12, color=edge_color)
+        else:
+            plt.text(xmin, ymax+10, f"{label_text}: {score:0.2f}", fontsize=12, color=edge_color)
 
-    plt.show()
+    # plt.show()
 
 
 annotation_files = []
 for filepath in [
-    '/app/books/train.txt',
-    '/app/not_braille/train.txt',
-    '/app/handwritten/train.txt',
-    '/app/uploaded/test2.txt',
+    # '/app/books/train.txt',
+    # '/app/not_braille/train.txt',
+    # '/app/handwritten/train.txt',
+    # '/app/uploaded/test2.txt',
     '/app/books/val.txt',
-    '/app/handwritten/val.txt',
+    # '/app/handwritten/val.txt',
 ]:
     with open(filepath, 'r') as file:
         annotation_files.extend([os.path.join(os.path.dirname(filepath), line.strip().replace('.jpg', '.json')) for line in file.readlines()])
 
 transform = transforms.Compose([
-    transforms.ToTensor()
+    transforms.ToTensor(),
+    transforms.Normalize(
+        mean=mean, 
+        std=std
+    )
 ])
 dataset = RetinaNetDataset(annotation_files, transform=transform, labels=labels)
 print('label_to_int:', dataset.label_to_int)
 print('int_to_label:', dataset.int_to_label)
 dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=2, pin_memory=True, collate_fn=labelbox_collate_fn)
 
-def bbox_iou(predicted_bboxes, target_bboxes):
-    """
-    Computes IoU between two bounding boxes
-    """
-    pred_x1, pred_y1, pred_x2, pred_y2 = torch.unbind(predicted_bboxes, dim=1)
-    target_x1, target_y1, target_x2, target_y2 = torch.unbind(target_bboxes, dim=0)
+# def bbox_iou(predicted_bboxes, target_bboxes):
+#     """
+#     Computes IoU between two bounding boxes
+#     """
+#     pred_x1, pred_y1, pred_x2, pred_y2 = torch.unbind(predicted_bboxes, dim=1)
+#     target_x1, target_y1, target_x2, target_y2 = torch.unbind(target_bboxes, dim=0)
 
-    # width and height of the intersection box
-    w_intsec = torch.min(pred_x2, target_x2) - torch.max(pred_x1, target_x1)
-    h_intsec = torch.min(pred_y2, target_y2) - torch.max(pred_y1, target_y1)
-    # Clamp negative values to zero
-    w_intsec = torch.clamp(w_intsec, min=0)
-    h_intsec = torch.clamp(h_intsec, min=0)
+#     # width and height of the intersection box
+#     w_intsec = torch.min(pred_x2, target_x2) - torch.max(pred_x1, target_x1)
+#     h_intsec = torch.min(pred_y2, target_y2) - torch.max(pred_y1, target_y1)
+#     # Clamp negative values to zero
+#     w_intsec = torch.clamp(w_intsec, min=0)
+#     h_intsec = torch.clamp(h_intsec, min=0)
 
-    # area of intersection box
-    area_int = w_intsec * h_intsec
-    # area of predicted and target boxes
-    area_pred = (pred_x2 - pred_x1) * (pred_y2 - pred_y1)
-    area_target = (target_x2 - target_x1) * (target_y2 - target_y1)
+#     # area of intersection box
+#     area_int = w_intsec * h_intsec
+#     # area of predicted and target boxes
+#     area_pred = (pred_x2 - pred_x1) * (pred_y2 - pred_y1)
+#     area_target = (target_x2 - target_x1) * (target_y2 - target_y1)
 
-    # Compute IoU
-    return area_int / (area_pred + area_target - area_int)
+#     # Compute IoU
+#     return area_int / (area_pred + area_target - area_int)
 
 def compute_acc_iou(model, dataloader, threshold=0.5):
     """
     Computes accuracy and average IoU
     """
+    global mean, std
+
     model.eval()
     correct = 0
     total = 0
     iou_sum = 0
+    progress_bar = tqdm(total=len(dataloader), desc=f'Iter')
+
     with torch.no_grad():
         for iter, data in enumerate(dataloader):
             images, targets = data
+            filename = targets[0]['filename']
 
             for i, im in enumerate(images):
                 images[i] = images[i].to(device)
@@ -193,25 +209,78 @@ def compute_acc_iou(model, dataloader, threshold=0.5):
             predicted_labels = outputs[0]['labels']
             
             total += len(targets[0]['boxes'])
+            errors = {
+                'boxes': [],
+                'labels': [],
+                'scores': []
+            }
             for i in range(len(targets[0]['boxes'])):
                 # find the best candidate for targets['boxes'] among predicted_bboxes
-                iou = bbox_iou(predicted_bboxes, targets[0]['boxes'][i])
+                # iou = bbox_iou(predicted_bboxes, targets[0]['boxes'][i])
+                iou = ops.boxes.box_iou(predicted_bboxes, targets[0]['boxes'][i].view(1, -1))
                 if len(iou) <= 0: continue
 
                 best_candidate_index = iou.argmax()
                 best_candidate_label = predicted_labels[best_candidate_index]
                 best_candidate_score = predicted_scores[best_candidate_index]
                 iou_sum += iou.max()
-                if iou.max() > threshold and best_candidate_label == targets[0]['labels'][i] and best_candidate_score > threshold:
+
+                if iou.max() > threshold and best_candidate_label == targets[0]['labels'][i]: # and best_candidate_score > threshold:
+                    # overlap is over threshold and label is correct
                     correct += 1
-                elif iou.max() > threshold and best_candidate_score>0.4:
-                    print(best_candidate_label.item(), targets[0]['labels'][i].item(), dataset.int_to_label[targets[0]['labels'][i].item()], best_candidate_score.item())
+
+                    # if targets[0]['labels'][i].item() == 102:
+                    #     # и
+                    #     print('bingo')
+
+                # elif iou.max() > threshold and best_candidate_score>0.4:
+                #   print(best_candidate_label.item(), targets[0]['labels'][i].item(), dataset.int_to_label[targets[0]['labels'][i].item()], best_candidate_score.item())
+
+                elif best_candidate_label != targets[0]['labels'][i] and best_candidate_score > threshold:
+                    print(predicted_labels, predicted_labels[best_candidate_index], iou)
+                    errors['boxes'].append(predicted_bboxes[best_candidate_index])
+                    errors['labels'].append(predicted_labels[best_candidate_index])
+                    errors['scores'].append(predicted_scores[best_candidate_index])
+
+                #     print(
+                #         best_candidate_label.item(), 
+                #         targets[0]['labels'][i].item(), 
+                #         dataset.int_to_label[targets[0]['labels'][i].item()], 
+                #         best_candidate_score.item(),
+                #         iou.max(),
+                #     )
+
                     # plot_image(images[0].cpu(), {
-                    #     'boxes': [predicted_bboxes[best_candidate_index]],
-                    #     'labels': [predicted_labels[best_candidate_index]],
-                    #     'scores': [predicted_scores[best_candidate_index]]
+                    #     'boxes': [predicted_bboxes[best_candidate_index], targets[0]['boxes'][i]],
+                    #     'labels': [predicted_labels[best_candidate_index], targets[0]['labels'][i]],
+                    #     'scores': [predicted_scores[best_candidate_index], 1]
                     # })
             
+            if len(errors['boxes'])>0:
+                # Create a figure and axes
+                # Reshaping the mean and std
+                image = images[0].cpu()
+                image = image * std + mean
+
+                fig, ax = plt.subplots(1)
+                ax.imshow(to_pil_image(image))
+            
+                print("filename", filename)
+
+                plot_image(ax, plt, targets[0], is_gt=True)
+                plot_image(ax, plt, errors, is_gt=False)
+            
+                plt.show()
+
+            progress_bar.set_postfix(
+                iter=iter,
+                total=total,
+                correct=correct,
+                acc=correct/total,
+                iou=(iou_sum/total).item()
+            )
+            progress_bar.update()
+
 
     acc = correct / total
     iou = iou_sum / total
@@ -223,14 +292,17 @@ num_classes = len(set(dataset.labels))
 model = models.detection.retinanet_resnet50_fpn_v2(
     weights=None,
     weights_backbone=models.ResNet50_Weights,
-    num_classes=num_classes
+    num_classes=num_classes,
+    # fg_iou_thresh=0.2,
+    # bg_iou_thresh=0.1
 )
 
 # model_name='model-3.pth'
 # model_name='model-6-0.823.pth'
 # model_name='model-7-0.778.pth'
 # model_name='model-8-0.847.pth'
-model_name='model-9-0.862.pth'
+# model_name='model-9-0.862.pth'
+model_name='model-12-0.865.pth'
 
 model.load_state_dict(torch.load('weights/' + model_name))
 model = model.to(device)

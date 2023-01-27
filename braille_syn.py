@@ -1,7 +1,7 @@
 # import the braille library
 from PIL import Image, ImageDraw, ImageFont
 
-
+# wrong encodeing !!!!
 braille_map = {
     'a': '⠁', 'b': '⠃', 'c': '⠉', 'd': '⠙', 'e': '⠑', 'f': '⠋',
     'g': '⠛', 'h': '⠓', 'i': '⠊', 'j': '⠚', 'k': '⠅', 'l': '⠇',
@@ -13,7 +13,7 @@ braille_map = {
     'G': '⠠⠛', 'H': '⠠⠓', 'I': '⠠⠊', 'J': '⠠⠚', 'K': '⠠⠅', 'L': '⠠⠇',
     'M': '⠠⠍', 'N': '⠠⠝', 'O': '⠠⠕', 'P': '⠠⠏', 'Q': '⠠⠟', 'R': '⠠⠗',
     'S': '⠠⠎', 'T': '⠠⠞', 'U': '⠠⠥', 'V': '⠠⠧', 'W': '⠠⠺', 'X': '⠠⠭',
-    'Y': '⠠⠽', 'Z': '⠠⠵', ' ': '⠀',
+    'Y': '⠠⠽', 'Z': '⠠⠵',
     '1': '⠼⠁', '2': '⠼⠃', '3': '⠼⠉', '4': '⠼⠙', '5': '⠼⠑', '6': '⠼⠋',
     '7': '⠼⠛', '8': '⠼⠓', '9': '⠼⠊', '0': '⠼⠚',
     '!': '⠈⠁', '"': '⠈⠃', '#': '⠈⠉', '$': '⠈⠙', '%': '⠈⠑', '&': '⠈⠋', 
@@ -34,7 +34,7 @@ def convert_to_braille(text):
     return braille_text
 
 # input text
-text = """Abstract-Braille is one of the most important means 
+text = """Abstract-Braille is one of the most important means
 of written
 communications between 
 visually-impaired and sighted
@@ -55,17 +55,20 @@ recognition can be used in recognizing Braille
 documents written in other languages too.
 
 Abstract-Il braille è uno dei più importanti 
-mezzi di comunicazione scritta tra ipovedenti e vedenti.
-comunicazione scritta tra persone ipovedenti e vedenti.
-persone ipovedenti, per cui suscita l'interesse 
-della ricerca. Questo documento descrive
-una nuova tecnica per il riconoscimento dei caratteri 
-Braille in un documento arabo documenti Braille 
-fronte/retro. La sfida principale risolta
-è quella di costruire un sistema OBR completo che sia completamente
-invariante alla scala dell'immagine scansionata a partire dallo scanner
-passando per le fasi di miglioramento dell'immagine, seguite dalle fasi di
-di rilevamento di parti di punti, poi di rilevamento dell'intero punto e infine di
+mezzi di comunicazione scritta tra ipovedenti 
+e vedenti. Comunicazione scritta tra persone 
+ipovedenti e vedenti. persone ipovedenti, per 
+cui suscita l'interesse della ricerca. Questo 
+documento descrive una nuova tecnica per 
+il riconoscimento dei caratteri Braille in 
+un documento arabo documenti Braille fronte/retro. 
+La sfida principale risolta è quella di costruire 
+un sistema OBR completo che sia completamente
+invariante alla scala dell'immagine scansionata 
+a partire dallo scanner passando per le fasi 
+di miglioramento dell'immagine, seguite dalle 
+fasi di di rilevamento di parti di punti, poi 
+di rilevamento dell'intero punto e infine di
 infine il riconoscimento della cella Braille. Questa tecnica può essere
 Questa tecnica può essere applicata indipendentemente dal grado del documento Braille (grado uno o grado due).
 grado o grado due). Inoltre, le fasi proposte fino al
