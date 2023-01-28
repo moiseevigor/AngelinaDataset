@@ -269,7 +269,8 @@ num_classes = len(set(train_dataset.labels))
 model = models.detection.retinanet_resnet50_fpn_v2(
     weights=None,
     weights_backbone=models.ResNet50_Weights,
-    num_classes=num_classes
+    num_classes=num_classes,
+    detections_per_img=840
 )
 
 if args.weights is not None:

@@ -14,6 +14,8 @@ from torch.nn import BCELoss
 from torchvision import transforms
 from tqdm import tqdm
 
+torch.set_printoptions(profile="full")
+
 # model-3, 116
 # label_to_int = {'!': 0, '##': 1, '(': 2, '()': 3, ')': 4, '*': 5, '+': 6, ',': 7, '-': 8, '.': 9, '..': 10, '/': 11, '/0': 12, '/1': 13, '/2': 14, '/3': 15, '/4': 16, '/5': 17, '/6': 18, '/7': 19, '/8': 20, '/9': 21, '0': 22, '1': 23, '2': 24, '3': 25, '4': 26, '5': 27, '6': 28, '7': 29, '8': 30, '9': 31, ':': 32, '::': 33, ';': 34, '=': 35, '>>': 36, '?': 37, 'CC': 38, 'XX': 39, 'a': 40, 'b': 41, 'c': 42, 'd': 43, 'e': 44, 'en': 45, 'f': 46, 'i': 47, 'k': 48, 'l': 49, 'm': 50, 'n': 51, 'o': 52, 'q': 53, 'r': 54, 's': 55, 't': 56, 'v': 57, 'w': 58, 'x': 59, 'y': 60, 'z': 61, '{': 62, '|': 63, '}': 64, '~1236': 65, '~12456': 66, '~13456': 67, '~1456': 68, '~3': 69, '~34': 70, '~346': 71, '~4': 72, '~46': 73, '~5': 74, '~56': 75, '~6': 76, '§': 77, '«': 78, '»': 79, 'Н': 80, 'СС': 81, 'ХХ': 82, 'а': 83, 'б': 84, 'в': 85, 'г': 86, 'д': 87, 'е': 88, 'ж': 89, 'з': 90, 'и': 91, 'й': 92, 'к': 93, 'л': 94, 'м': 95, 'н': 96, 'о': 97, 'п': 98, 'р': 99, 'с': 100, 'т': 101, 'у': 102, 'ф': 103, 'х': 104, 'ц': 105, 'ч': 106, 'ш': 107, 'щ': 108, 'ъ': 109, 'ы': 110, 'ь': 111, 'э': 112, 'ю': 113, 'я': 114, 'ё': 115, 'p': 116, 'В': 117, 'Л': 118}
 # int_to_label = {0: '!', 1: '##', 2: '(', 3: '()', 4: ')', 5: '*', 6: '+', 7: ',', 8: '-', 9: '.', 10: '..', 11: '/', 12: '/0', 13: '/1', 14: '/2', 15: '/3', 16: '/4', 17: '/5', 18: '/6', 19: '/7', 20: '/8', 21: '/9', 22: '0', 23: '1', 24: '2', 25: '3', 26: '4', 27: '5', 28: '6', 29: '7', 30: '8', 31: '9', 32: ':', 33: '::', 34: ';', 35: '=', 36: '>>', 37: '?', 38: 'CC', 39: 'XX', 40: 'a', 41: 'b', 42: 'c', 43: 'd', 44: 'e', 45: 'en', 46: 'f', 47: 'i', 48: 'k', 49: 'l', 50: 'm', 51: 'n', 52: 'o', 53: 'q', 54: 'r', 55: 's', 56: 't', 57: 'v', 58: 'w', 59: 'x', 60: 'y', 61: 'z', 62: '{', 63: '|', 64: '}', 65: '~1236', 66: '~12456', 67: '~13456', 68: '~1456', 69: '~3', 70: '~34', 71: '~346', 72: '~4', 73: '~46', 74: '~5', 75: '~56', 76: '~6', 77: '§', 78: '«', 79: '»', 80: 'Н', 81: 'СС', 82: 'ХХ', 83: 'а', 84: 'б', 85: 'в', 86: 'г', 87: 'д', 88: 'е', 89: 'ж', 90: 'з', 91: 'и', 92: 'й', 93: 'к', 94: 'л', 95: 'м', 96: 'н', 97: 'о', 98: 'п', 99: 'р', 100: 'с', 101: 'т', 102: 'у', 103: 'ф', 104: 'х', 105: 'ц', 106: 'ч', 107: 'ш', 108: 'щ', 109: 'ъ', 110: 'ы', 111: 'ь', 112: 'э', 113: 'ю', 114: 'я', 115: 'ё', 116: 'p', 117: 'В', 118: 'Л'}
@@ -129,6 +131,7 @@ def plot_image(ax, plt, prediction, is_gt=True):
             plt.text(xmin, ymin-5, f"{label_text}", fontsize=12, color=edge_color)
         else:
             plt.text(xmin, ymax+10, f"{label_text}: {score:0.2f}", fontsize=12, color=edge_color)
+            # plt.text(xmin, ymax+10, f"{label_text}", fontsize=12, color=edge_color)
 
     # plt.show()
 
@@ -140,7 +143,7 @@ for filepath in [
     # '/app/handwritten/train.txt',
     # '/app/uploaded/test2.txt',
     '/app/books/val.txt',
-    # '/app/handwritten/val.txt',
+    '/app/handwritten/val.txt',
 ]:
     with open(filepath, 'r') as file:
         annotation_files.extend([os.path.join(os.path.dirname(filepath), line.strip().replace('.jpg', '.json')) for line in file.readlines()])
@@ -157,30 +160,30 @@ print('label_to_int:', dataset.label_to_int)
 print('int_to_label:', dataset.int_to_label)
 dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=2, pin_memory=True, collate_fn=labelbox_collate_fn)
 
-# def bbox_iou(predicted_bboxes, target_bboxes):
-#     """
-#     Computes IoU between two bounding boxes
-#     """
-#     pred_x1, pred_y1, pred_x2, pred_y2 = torch.unbind(predicted_bboxes, dim=1)
-#     target_x1, target_y1, target_x2, target_y2 = torch.unbind(target_bboxes, dim=0)
+def bbox_iou(predicted_bboxes, target_bboxes):
+    """
+    Computes IoU between two bounding boxes
+    """
+    pred_x1, pred_y1, pred_x2, pred_y2 = torch.unbind(predicted_bboxes, dim=1)
+    target_x1, target_y1, target_x2, target_y2 = torch.unbind(target_bboxes, dim=0)
 
-#     # width and height of the intersection box
-#     w_intsec = torch.min(pred_x2, target_x2) - torch.max(pred_x1, target_x1)
-#     h_intsec = torch.min(pred_y2, target_y2) - torch.max(pred_y1, target_y1)
-#     # Clamp negative values to zero
-#     w_intsec = torch.clamp(w_intsec, min=0)
-#     h_intsec = torch.clamp(h_intsec, min=0)
+    # width and height of the intersection box
+    w_intsec = torch.min(pred_x2, target_x2) - torch.max(pred_x1, target_x1)
+    h_intsec = torch.min(pred_y2, target_y2) - torch.max(pred_y1, target_y1)
+    # Clamp negative values to zero
+    w_intsec = torch.clamp(w_intsec, min=0)
+    h_intsec = torch.clamp(h_intsec, min=0)
 
-#     # area of intersection box
-#     area_int = w_intsec * h_intsec
-#     # area of predicted and target boxes
-#     area_pred = (pred_x2 - pred_x1) * (pred_y2 - pred_y1)
-#     area_target = (target_x2 - target_x1) * (target_y2 - target_y1)
+    # area of intersection box
+    area_int = w_intsec * h_intsec
+    # area of predicted and target boxes
+    area_pred = (pred_x2 - pred_x1) * (pred_y2 - pred_y1)
+    area_target = (target_x2 - target_x1) * (target_y2 - target_y1)
 
-#     # Compute IoU
-#     return area_int / (area_pred + area_target - area_int)
+    # Compute IoU
+    return area_int / (area_pred + area_target - area_int)
 
-def compute_acc_iou(model, dataloader, threshold=0.5):
+def compute_acc_iou(model, dataloader, threshold=0.45):
     """
     Computes accuracy and average IoU
     """
@@ -203,6 +206,8 @@ def compute_acc_iou(model, dataloader, threshold=0.5):
                 targets[i]['labels'] = targets[i]['labels'].to(device)
 
             outputs = model(images)
+            # model.compute_loss(targets, outputs[0], [])
+            # import pdb; pdb.set_trace()
 
             predicted_bboxes = outputs[0]['boxes']
             predicted_scores = outputs[0]['scores']
@@ -214,6 +219,13 @@ def compute_acc_iou(model, dataloader, threshold=0.5):
                 'labels': [],
                 'scores': []
             }
+
+            # iou = ops.boxes.box_iou(targets[0]['boxes'], predicted_bboxes)
+            # iou_val, best_candidate_index = iou.max(1)
+            # print(filename)
+            # if filename=='/app/books/ola/IMG_5200.labeled.jpg':
+            #     import pdb; pdb.set_trace()
+
             for i in range(len(targets[0]['boxes'])):
                 # find the best candidate for targets['boxes'] among predicted_bboxes
                 # iou = bbox_iou(predicted_bboxes, targets[0]['boxes'][i])
@@ -225,52 +237,48 @@ def compute_acc_iou(model, dataloader, threshold=0.5):
                 best_candidate_score = predicted_scores[best_candidate_index]
                 iou_sum += iou.max()
 
-                if iou.max() > threshold and best_candidate_label == targets[0]['labels'][i]: # and best_candidate_score > threshold:
+                if iou.max() > threshold and best_candidate_label == targets[0]['labels'][i] and best_candidate_score > threshold:
                     # overlap is over threshold and label is correct
                     correct += 1
-
-                    # if targets[0]['labels'][i].item() == 102:
-                    #     # и
-                    #     print('bingo')
 
                 # elif iou.max() > threshold and best_candidate_score>0.4:
                 #   print(best_candidate_label.item(), targets[0]['labels'][i].item(), dataset.int_to_label[targets[0]['labels'][i].item()], best_candidate_score.item())
 
-                elif best_candidate_label != targets[0]['labels'][i] and best_candidate_score > threshold:
-                    print(predicted_labels, predicted_labels[best_candidate_index], iou)
-                    errors['boxes'].append(predicted_bboxes[best_candidate_index])
-                    errors['labels'].append(predicted_labels[best_candidate_index])
-                    errors['scores'].append(predicted_scores[best_candidate_index])
+                # elif iou.max() > threshold and best_candidate_label != targets[0]['labels'][i] and best_candidate_score > threshold:
+            #     else:
+            #         print(
+            #             int_to_label[predicted_labels[best_candidate_index].item()], 
+            #             predicted_labels[best_candidate_index], 
+            #             predicted_bboxes[best_candidate_index], 
+            #             best_candidate_score, 
+            #             iou.max()
+            #         )
+            #         print(
+            #             int_to_label[targets[0]['labels'][i].item()], 
+            #             targets[0]['labels'][i], 
+            #             targets[0]['boxes'][i],
+            #             "\n"
+            #         )
 
-                #     print(
-                #         best_candidate_label.item(), 
-                #         targets[0]['labels'][i].item(), 
-                #         dataset.int_to_label[targets[0]['labels'][i].item()], 
-                #         best_candidate_score.item(),
-                #         iou.max(),
-                #     )
-
-                    # plot_image(images[0].cpu(), {
-                    #     'boxes': [predicted_bboxes[best_candidate_index], targets[0]['boxes'][i]],
-                    #     'labels': [predicted_labels[best_candidate_index], targets[0]['labels'][i]],
-                    #     'scores': [predicted_scores[best_candidate_index], 1]
-                    # })
+            #         errors['boxes'].append(predicted_bboxes[best_candidate_index])
+            #         errors['labels'].append(predicted_labels[best_candidate_index])
+            #         errors['scores'].append(predicted_scores[best_candidate_index])
+                
             
-            if len(errors['boxes'])>0:
-                # Create a figure and axes
-                # Reshaping the mean and std
-                image = images[0].cpu()
-                image = image * std + mean
+            # if len(errors['boxes'])>10:
+            #     # Create a figure and axes
+            #     # Reshaping the mean and std
+            #     image = images[0].cpu()
+            #     image = image * std + mean
 
-                fig, ax = plt.subplots(1)
-                ax.imshow(to_pil_image(image))
+            #     fig, ax = plt.subplots(1)
+            #     ax.imshow(to_pil_image(image))
             
-                print("filename", filename)
+            #     print("filename", filename)
 
-                plot_image(ax, plt, targets[0], is_gt=True)
-                plot_image(ax, plt, errors, is_gt=False)
-            
-                plt.show()
+            #     plot_image(ax, plt, targets[0], is_gt=True)
+            #     plot_image(ax, plt, errors, is_gt=False)
+            #     plt.show()
 
             progress_bar.set_postfix(
                 iter=iter,
@@ -293,6 +301,8 @@ model = models.detection.retinanet_resnet50_fpn_v2(
     weights=None,
     weights_backbone=models.ResNet50_Weights,
     num_classes=num_classes,
+    score_thresh=0.45,
+    detections_per_img=840,
     # fg_iou_thresh=0.2,
     # bg_iou_thresh=0.1
 )

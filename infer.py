@@ -24,7 +24,10 @@ import pprint
 # image = Image.open("/app/test/pagina_braille_fotografata_lowres.jpg")
 # image = Image.open("/app/test/pagina_braille_scannerizzata_1.jpg")
 # image = Image.open("/app/test/pagina_braille_scannerizzata_2.jpeg")
-image = Image.open("/app/test/braille.png")
+# image = Image.open("/app/test/braille.png")
+# image = Image.open("/app/test/chemistry.webp")
+# image = Image.open("/app/test/text-1.jpeg")
+image = Image.open("/app/test/braille-outdoor.jpg")
 
 
 # model 1, 83
@@ -131,6 +134,7 @@ def russian_to_italian(text):
 
 model = retinanet_resnet50_fpn_v2(num_classes=127, score_thresh=0.45, detections_per_img=840)
 model.load_state_dict(torch.load('weights/model-9-0.862.pth'))
+# model.load_state_dict(torch.load('weights/model-12-0.865.pth'))
 
 # Put the model in inference mode
 model.eval()
@@ -141,7 +145,7 @@ std=[0.12675546510063618, 0.13864833881922706, 0.14966126335877825]
 # Define multiple transforms
 transform = transforms.Compose([
     transforms.ToTensor(),
-    transforms.Resize([1376, 1024]),
+    # transforms.Resize([1376, 1024]),
     # transforms.RandomCrop([1376, 1024]),
     transforms.Normalize(
         mean=mean,

@@ -49,3 +49,7 @@ Links
 - pretrained retinanet https://github.com/pytorch/vision/issues/3442
 - fine tunning https://pytorch.org/tutorials/intermediate/torchvision_tutorial.html
 - https://towardsdatascience.com/review-retinanet-focal-loss-object-detection-38fba6afabe4
+
+validation los of retinanet
+- frcnn https://stackoverflow.com/questions/60339336/validation-loss-for-pytorch-faster-rcnn/65347721#65347721
+- https://discuss.pytorch.org/t/compute-validation-loss-for-faster-rcnn/62333/11
