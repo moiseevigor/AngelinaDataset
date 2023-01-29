@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from PIL import Image
 from torch.utils.data.dataloader import default_collate
+import torchvision.ops as ops
 import argparse
 
 import torch
@@ -19,9 +20,9 @@ parser = argparse.ArgumentParser(description='Load model weights')
 parser.add_argument('--weights', required=False, help='Path to the model weights file')
 args = parser.parse_args()
 
-num_experiment = 16
+num_experiment = 17
 # Create a SummaryWriter object
-writer = SummaryWriter(f'/app/experiments/retinanet/iadamw/exp-{num_experiment}-resnet50-onecyclelr-image-norm')
+writer = SummaryWriter(f'/app/experiments/retinanet/adamw/exp-{num_experiment}-resnet50')
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -200,28 +201,28 @@ test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=True, num_worke
 #     plt.show()
 # exit()
 
-def bbox_iou(predicted_bboxes, target_bboxes):
-    """
-    Computes IoU between two bounding boxes
-    """
-    pred_x1, pred_y1, pred_x2, pred_y2 = torch.unbind(predicted_bboxes, dim=1)
-    target_x1, target_y1, target_x2, target_y2 = torch.unbind(target_bboxes, dim=0)
+# def bbox_iou(predicted_bboxes, target_bboxes):
+#     """
+#     Computes IoU between two bounding boxes
+#     """
+#     pred_x1, pred_y1, pred_x2, pred_y2 = torch.unbind(predicted_bboxes, dim=1)
+#     target_x1, target_y1, target_x2, target_y2 = torch.unbind(target_bboxes, dim=0)
 
-    # width and height of the intersection box
-    w_intsec = torch.min(pred_x2, target_x2) - torch.max(pred_x1, target_x1)
-    h_intsec = torch.min(pred_y2, target_y2) - torch.max(pred_y1, target_y1)
-    # Clamp negative values to zero
-    w_intsec = torch.clamp(w_intsec, min=0)
-    h_intsec = torch.clamp(h_intsec, min=0)
+#     # width and height of the intersection box
+#     w_intsec = torch.min(pred_x2, target_x2) - torch.max(pred_x1, target_x1)
+#     h_intsec = torch.min(pred_y2, target_y2) - torch.max(pred_y1, target_y1)
+#     # Clamp negative values to zero
+#     w_intsec = torch.clamp(w_intsec, min=0)
+#     h_intsec = torch.clamp(h_intsec, min=0)
 
-    # area of intersection box
-    area_int = w_intsec * h_intsec
-    # area of predicted and target boxes
-    area_pred = (pred_x2 - pred_x1) * (pred_y2 - pred_y1)
-    area_target = (target_x2 - target_x1) * (target_y2 - target_y1)
+#     # area of intersection box
+#     area_int = w_intsec * h_intsec
+#     # area of predicted and target boxes
+#     area_pred = (pred_x2 - pred_x1) * (pred_y2 - pred_y1)
+#     area_target = (target_x2 - target_x1) * (target_y2 - target_y1)
 
-    # Compute IoU
-    return area_int / (area_pred + area_target - area_int)
+#     # Compute IoU
+#     return area_int / (area_pred + area_target - area_int)
 
 def compute_acc_iou(model, dataloader, threshold=0.5):
     """
@@ -249,7 +250,8 @@ def compute_acc_iou(model, dataloader, threshold=0.5):
             total += len(targets[0]['boxes'])
             for i in range(len(targets[0]['boxes'])):
                 # find the best candidate for targets['boxes'] among predicted_bboxes
-                iou = bbox_iou(predicted_bboxes, targets[0]['boxes'][i])
+                # iou = bbox_iou(predicted_bboxes, targets[0]['boxes'][i])
+                iou = ops.boxes.box_iou(predicted_bboxes, targets[0]['boxes'][i].view(1, -1))
                 if len(iou) <= 0: continue
 
                 best_candidate_index = iou.argmax()
@@ -278,9 +280,10 @@ if args.weights is not None:
 
 model = model.to(device)
 
-# optimizer = Adam(model.parameters(), lr=1e-5)
-optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5, weight_decay=0.0001)
-# optimizer = torch.optim.SGD(model.parameters(), lr=1e-5, momentum=0.5, weight_decay=1e-4)
+max_lr=5e-5
+# optimizer = Adam(model.parameters(), lr=max_lr)
+optimizer = torch.optim.AdamW(model.parameters(), lr=max_lr, weight_decay=0.0001)
+# optimizer = torch.optim.SGD(model.parameters(), lr=max_lr, momentum=0.5, weight_decay=1e-4)
 
 # define the number of training steps
 num_epochs = 50
@@ -291,18 +294,18 @@ val_accuracy = 0
 # Define the learning rate scheduler
 scheduler = torch.optim.lr_scheduler.OneCycleLR(
     optimizer,
-    max_lr=0.001,
+    max_lr=max_lr,
     # total_steps=batch_size*num_epochs,
     epochs=num_epochs,
     steps_per_epoch=len(train_dataloader),
     pct_start=0.125,
     anneal_strategy='linear',
-    cycle_momentum=True,
-    base_momentum=0.85,
-    max_momentum=0.95,
-    div_factor=10,
-    final_div_factor=10.0,
-    three_phase=True
+    # cycle_momentum=True,
+    # base_momentum=0.85,
+    # max_momentum=0.95,
+    div_factor=1,
+    # final_div_factor=10.0,
+    # three_phase=True
 )
 
 for epoch in range(num_epochs):

@@ -220,11 +220,11 @@ def compute_acc_iou(model, dataloader, threshold=0.45):
                 'scores': []
             }
 
-            # iou = ops.boxes.box_iou(targets[0]['boxes'], predicted_bboxes)
-            # iou_val, best_candidate_index = iou.max(1)
-            # print(filename)
-            # if filename=='/app/books/ola/IMG_5200.labeled.jpg':
-            #     import pdb; pdb.set_trace()
+            iou = ops.boxes.box_iou(targets[0]['boxes'], predicted_bboxes)
+            iou_val, best_candidate_index = iou.max(1)
+            print(filename)
+            if filename=='/app/books/ola/IMG_5200.labeled.jpg':
+                import pdb; pdb.set_trace()
 
             for i in range(len(targets[0]['boxes'])):
                 # find the best candidate for targets['boxes'] among predicted_bboxes
@@ -311,8 +311,11 @@ model = models.detection.retinanet_resnet50_fpn_v2(
 # model_name='model-6-0.823.pth'
 # model_name='model-7-0.778.pth'
 # model_name='model-8-0.847.pth'
+# 95% val
 # model_name='model-9-0.862.pth'
-model_name='model-12-0.865.pth'
+# 96% val
+# model_name='model-12-0.865.pth'
+model_name='model-17-0.917.pth'
 
 model.load_state_dict(torch.load('weights/' + model_name))
 model = model.to(device)
