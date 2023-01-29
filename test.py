@@ -138,12 +138,12 @@ def plot_image(ax, plt, prediction, is_gt=True):
 
 annotation_files = []
 for filepath in [
-    # '/app/books/train.txt',
+    '/app/books/train.txt',
     # '/app/not_braille/train.txt',
-    # '/app/handwritten/train.txt',
-    # '/app/uploaded/test2.txt',
-    '/app/books/val.txt',
-    '/app/handwritten/val.txt',
+    '/app/handwritten/train.txt',
+    '/app/uploaded/test2.txt',
+    # '/app/books/val.txt',
+    # '/app/handwritten/val.txt',
 ]:
     with open(filepath, 'r') as file:
         annotation_files.extend([os.path.join(os.path.dirname(filepath), line.strip().replace('.jpg', '.json')) for line in file.readlines()])
@@ -151,7 +151,7 @@ for filepath in [
 transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize(
-        mean=mean, 
+        mean=mean,
         std=std
     )
 ])
@@ -190,9 +190,13 @@ def compute_acc_iou(model, dataloader, threshold=0.45):
     global mean, std
 
     model.eval()
-    correct = 0
     total = 0
     iou_sum = 0
+    correct_sum = 0
+    errors_sum = 0
+    misses_sum = 0
+    false_positives_sum = 0
+
     progress_bar = tqdm(total=len(dataloader), desc=f'Iter')
 
     with torch.no_grad():
@@ -214,77 +218,58 @@ def compute_acc_iou(model, dataloader, threshold=0.45):
             predicted_labels = outputs[0]['labels']
             
             total += len(targets[0]['boxes'])
-            errors = {
-                'boxes': [],
-                'labels': [],
-                'scores': []
-            }
 
             iou = ops.boxes.box_iou(targets[0]['boxes'], predicted_bboxes)
             iou_val, best_candidate_index = iou.max(1)
-            print(filename)
-            if filename=='/app/books/ola/IMG_5200.labeled.jpg':
-                import pdb; pdb.set_trace()
+            iou_sum += iou_val.sum()
+            
+            correct = ((iou_val>threshold)*(targets[0]['labels']==predicted_labels[best_candidate_index])*(predicted_scores[best_candidate_index]>threshold))
+            false_positives = ((iou_val>0)*(targets[0]['labels']!=predicted_labels[best_candidate_index]))
+            misses = (iou_val==0)
+            errors = false_positives+misses
 
-            for i in range(len(targets[0]['boxes'])):
-                # find the best candidate for targets['boxes'] among predicted_bboxes
-                # iou = bbox_iou(predicted_bboxes, targets[0]['boxes'][i])
-                iou = ops.boxes.box_iou(predicted_bboxes, targets[0]['boxes'][i].view(1, -1))
-                if len(iou) <= 0: continue
+            correct_sum += correct.sum()
+            false_positives_sum += false_positives.sum()
+            misses_sum += misses.sum()
+            errors_sum += errors.sum()
 
-                best_candidate_index = iou.argmax()
-                best_candidate_label = predicted_labels[best_candidate_index]
-                best_candidate_score = predicted_scores[best_candidate_index]
-                iou_sum += iou.max()
+            # if filename=='/app/books/ola/IMG_5200.labeled.jpg':
+            # if filename=='/app/books/chudo_derevo_redmi/IMG_20190715_113004.labeled.jpg':
+            # if filename=='/app/books/skazki/IMG_20190715_121034.labeled.jpg':
+            #     import pdb; pdb.set_trace()
 
-                if iou.max() > threshold and best_candidate_label == targets[0]['labels'][i] and best_candidate_score > threshold:
-                    # overlap is over threshold and label is correct
-                    correct += 1
+            if errors.sum()>1000:
+                # Reshaping the mean and std
+                image = images[0].detach().cpu()
+                image = image * std + mean
 
-                # elif iou.max() > threshold and best_candidate_score>0.4:
-                #   print(best_candidate_label.item(), targets[0]['labels'][i].item(), dataset.int_to_label[targets[0]['labels'][i].item()], best_candidate_score.item())
+                # Create a figure and axes
+                fig, ax = plt.subplots(1)
+                ax.imshow(to_pil_image(image))
 
-                # elif iou.max() > threshold and best_candidate_label != targets[0]['labels'][i] and best_candidate_score > threshold:
-            #     else:
-            #         print(
-            #             int_to_label[predicted_labels[best_candidate_index].item()], 
-            #             predicted_labels[best_candidate_index], 
-            #             predicted_bboxes[best_candidate_index], 
-            #             best_candidate_score, 
-            #             iou.max()
-            #         )
-            #         print(
-            #             int_to_label[targets[0]['labels'][i].item()], 
-            #             targets[0]['labels'][i], 
-            #             targets[0]['boxes'][i],
-            #             "\n"
-            #         )
+                print("filename", filename)
 
-            #         errors['boxes'].append(predicted_bboxes[best_candidate_index])
-            #         errors['labels'].append(predicted_labels[best_candidate_index])
-            #         errors['scores'].append(predicted_scores[best_candidate_index])
+                print({
+                    'boxes': predicted_bboxes[best_candidate_index[errors]],
+                    'labels': predicted_labels[best_candidate_index[errors]],
+                    'scores': predicted_scores[best_candidate_index[errors]],
+                })
+
+                plot_image(ax, plt, targets[0], is_gt=True)
+                # plot_image(ax, plt, {'boxes': predicted_bboxes[best_candidate_index[errors]],'labels': predicted_labels[best_candidate_index[errors]],'scores': predicted_scores[best_candidate_index[errors]],}, is_gt=False)
+                plot_image(ax, plt, {'boxes': predicted_bboxes,'labels': predicted_labels,'scores': predicted_scores,}, is_gt=False)
+                plot_image(ax, plt, {'boxes': targets[0]['boxes'][misses],'labels': targets[0]['labels'][misses]}, is_gt=True)
                 
-            
-            # if len(errors['boxes'])>10:
-            #     # Create a figure and axes
-            #     # Reshaping the mean and std
-            #     image = images[0].cpu()
-            #     image = image * std + mean
-
-            #     fig, ax = plt.subplots(1)
-            #     ax.imshow(to_pil_image(image))
-            
-            #     print("filename", filename)
-
-            #     plot_image(ax, plt, targets[0], is_gt=True)
-            #     plot_image(ax, plt, errors, is_gt=False)
-            #     plt.show()
+                plt.show()
 
             progress_bar.set_postfix(
                 iter=iter,
                 total=total,
-                correct=correct,
-                acc=correct/total,
+                correct=correct_sum.item(),
+                false_positives=false_positives_sum.item(),
+                misses=misses_sum.item(),
+                errors=errors_sum.item(),
+                acc=(correct_sum/total).item(),
                 iou=(iou_sum/total).item()
             )
             progress_bar.update()
@@ -315,7 +300,8 @@ model = models.detection.retinanet_resnet50_fpn_v2(
 # model_name='model-9-0.862.pth'
 # 96% val
 # model_name='model-12-0.865.pth'
-model_name='model-17-0.917.pth'
+# model_name='model-17-0.917.pth'
+model_name='model-18-0.933.pth'
 
 model.load_state_dict(torch.load('weights/' + model_name))
 model = model.to(device)
@@ -328,5 +314,5 @@ with torch.no_grad():
 print(
     model_name,
     'val_acc', val_acc, 
-    'val_iou', val_iou.item()
+    'val_iou', val_iou
 )

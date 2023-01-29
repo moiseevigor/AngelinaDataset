@@ -20,7 +20,7 @@ parser = argparse.ArgumentParser(description='Load model weights')
 parser.add_argument('--weights', required=False, help='Path to the model weights file')
 args = parser.parse_args()
 
-num_experiment = 17
+num_experiment = 18
 # Create a SummaryWriter object
 writer = SummaryWriter(f'/app/experiments/retinanet/adamw/exp-{num_experiment}-resnet50')
 
@@ -298,13 +298,13 @@ scheduler = torch.optim.lr_scheduler.OneCycleLR(
     # total_steps=batch_size*num_epochs,
     epochs=num_epochs,
     steps_per_epoch=len(train_dataloader),
-    pct_start=0.125,
+    pct_start=0.4,
     anneal_strategy='linear',
     # cycle_momentum=True,
     # base_momentum=0.85,
     # max_momentum=0.95,
     div_factor=1,
-    # final_div_factor=10.0,
+    final_div_factor=5.0,
     # three_phase=True
 )
 
