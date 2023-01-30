@@ -29,7 +29,7 @@ label_to_int = {'!': 0, '##': 1, '(': 2, '()': 3, ')': 4, '*': 5, '+': 6, ',': 7
 int_to_label = {0: '!', 1: '##', 2: '(', 3: '()', 4: ')', 5: '*', 6: '+', 7: ',', 8: '-', 9: '.', 10: '..', 11: '/', 12: '/0', 13: '/1', 14: '/2', 15: '/3', 16: '/4', 17: '/5', 18: '/6', 19: '/7', 20: '/8', 21: '/9', 22: '0', 23: '1', 24: '2', 25: '3', 26: '4', 27: '5', 28: '6', 29: '7', 30: '8', 31: '9', 32: ':', 33: '::', 34: ';', 35: '=', 36: '>>', 37: '?', 38: 'CC', 39: 'XX', 40: 'a', 41: 'b', 42: 'background', 43: 'c', 44: 'd', 45: 'e', 46: 'en', 47: 'f', 48: 'i', 49: 'k', 50: 'l', 51: 'm', 52: 'n', 53: 'o', 54: 'p', 55: 'q', 56: 'r', 57: 's', 58: 't', 59: 'v', 60: 'w', 61: 'x', 62: 'y', 63: 'z', 64: '{', 65: '|', 66: '}', 67: '~1236', 68: '~12456', 69: '~13456', 70: '~1456', 71: '~3', 72: '~34', 73: '~346', 74: '~4', 75: '~46', 76: '~5', 77: '~56', 78: '~6', 79: '§', 80: '«', 81: '»', 82: 'В', 83: 'И', 84: 'Л', 85: 'М', 86: 'Н', 87: 'О', 88: 'П', 89: 'С', 90: 'СС', 91: 'Т', 92: 'Ф', 93: 'ХХ', 94: 'а', 95: 'б', 96: 'в', 97: 'г', 98: 'д', 99: 'е', 100: 'ж', 101: 'з', 102: 'и', 103: 'й', 104: 'к', 105: 'л', 106: 'м', 107: 'н', 108: 'о', 109: 'п', 110: 'р', 111: 'с', 112: 'т', 113: 'у', 114: 'ф', 115: 'х', 116: 'ц', 117: 'ч', 118: 'ш', 119: 'щ', 120: 'ъ', 121: 'ы', 122: 'ь', 123: 'э', 124: 'ю', 125: 'я', 126: 'ё'}
 
 labels = sorted(set(int_to_label.values()))
-print('labels', labels)
+# print('labels', labels)
 
 # device = 'cuda' if torch.cuda.is_available() else 'cpu'
 device = 'cpu'
@@ -138,12 +138,12 @@ def plot_image(ax, plt, prediction, is_gt=True):
 
 annotation_files = []
 for filepath in [
-    '/app/books/train.txt',
+    # '/app/books/train.txt',
     # '/app/not_braille/train.txt',
-    '/app/handwritten/train.txt',
-    '/app/uploaded/test2.txt',
-    # '/app/books/val.txt',
-    # '/app/handwritten/val.txt',
+    # '/app/handwritten/train.txt',
+    # '/app/uploaded/test2.txt',
+    '/app/books/val.txt',
+    '/app/handwritten/val.txt',
 ]:
     with open(filepath, 'r') as file:
         annotation_files.extend([os.path.join(os.path.dirname(filepath), line.strip().replace('.jpg', '.json')) for line in file.readlines()])
@@ -156,8 +156,8 @@ transform = transforms.Compose([
     )
 ])
 dataset = RetinaNetDataset(annotation_files, transform=transform, labels=labels)
-print('label_to_int:', dataset.label_to_int)
-print('int_to_label:', dataset.int_to_label)
+# print('label_to_int:', dataset.label_to_int)
+# print('int_to_label:', dataset.int_to_label)
 dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=2, pin_memory=True, collate_fn=labelbox_collate_fn)
 
 def bbox_iou(predicted_bboxes, target_bboxes):
@@ -186,15 +186,23 @@ def bbox_iou(predicted_bboxes, target_bboxes):
 def compute_acc_iou(model, dataloader, threshold=0.45):
     """
     Computes accuracy and average IoU
+        True Positive (TP): model correctly detects and classifies a braille char as a char.
+        False Positive (FP): model detects an object as a braille char, even though it is not a braille char.
+        False Negative (FN): model fails to detect a braille char in an image, even though a braille char is present.
+        True Negative (TN): model correctly detects that there is no braille char in an image, and classifies it as negative.
     """
     global mean, std
 
     model.eval()
     total = 0
     iou_sum = 0
-    correct_sum = 0
     errors_sum = 0
-    misses_sum = 0
+
+    # correctly detected
+    true_postives_sum = 0
+    # misses
+    false_negative_sum = 0
+    # wrongly classified
     false_positives_sum = 0
 
     progress_bar = tqdm(total=len(dataloader), desc=f'Iter')
@@ -210,8 +218,6 @@ def compute_acc_iou(model, dataloader, threshold=0.45):
                 targets[i]['labels'] = targets[i]['labels'].to(device)
 
             outputs = model(images)
-            # model.compute_loss(targets, outputs[0], [])
-            # import pdb; pdb.set_trace()
 
             predicted_bboxes = outputs[0]['boxes']
             predicted_scores = outputs[0]['scores']
@@ -223,20 +229,15 @@ def compute_acc_iou(model, dataloader, threshold=0.45):
             iou_val, best_candidate_index = iou.max(1)
             iou_sum += iou_val.sum()
             
-            correct = ((iou_val>threshold)*(targets[0]['labels']==predicted_labels[best_candidate_index])*(predicted_scores[best_candidate_index]>threshold))
+            true_postives = ((iou_val>threshold)*(targets[0]['labels']==predicted_labels[best_candidate_index])*(predicted_scores[best_candidate_index]>threshold))
             false_positives = ((iou_val>0)*(targets[0]['labels']!=predicted_labels[best_candidate_index]))
-            misses = (iou_val==0)
-            errors = false_positives+misses
+            false_negative = (iou_val==0)
+            errors = false_positives+false_negative
 
-            correct_sum += correct.sum()
+            true_postives_sum += true_postives.sum()
             false_positives_sum += false_positives.sum()
-            misses_sum += misses.sum()
+            false_negative_sum += false_negative.sum()
             errors_sum += errors.sum()
-
-            # if filename=='/app/books/ola/IMG_5200.labeled.jpg':
-            # if filename=='/app/books/chudo_derevo_redmi/IMG_20190715_113004.labeled.jpg':
-            # if filename=='/app/books/skazki/IMG_20190715_121034.labeled.jpg':
-            #     import pdb; pdb.set_trace()
 
             if errors.sum()>1000:
                 # Reshaping the mean and std
@@ -249,36 +250,29 @@ def compute_acc_iou(model, dataloader, threshold=0.45):
 
                 print("filename", filename)
 
-                print({
-                    'boxes': predicted_bboxes[best_candidate_index[errors]],
-                    'labels': predicted_labels[best_candidate_index[errors]],
-                    'scores': predicted_scores[best_candidate_index[errors]],
-                })
-
                 plot_image(ax, plt, targets[0], is_gt=True)
-                # plot_image(ax, plt, {'boxes': predicted_bboxes[best_candidate_index[errors]],'labels': predicted_labels[best_candidate_index[errors]],'scores': predicted_scores[best_candidate_index[errors]],}, is_gt=False)
                 plot_image(ax, plt, {'boxes': predicted_bboxes,'labels': predicted_labels,'scores': predicted_scores,}, is_gt=False)
-                plot_image(ax, plt, {'boxes': targets[0]['boxes'][misses],'labels': targets[0]['labels'][misses]}, is_gt=True)
+                plot_image(ax, plt, {'boxes': targets[0]['boxes'][false_negative],'labels': targets[0]['labels'][false_negative]}, is_gt=True)
                 
                 plt.show()
 
             progress_bar.set_postfix(
-                iter=iter,
                 total=total,
-                correct=correct_sum.item(),
-                false_positives=false_positives_sum.item(),
-                misses=misses_sum.item(),
+                tp=true_postives_sum.item(),
+                fp=false_positives_sum.item(),
+                fn=false_negative_sum.item(),
                 errors=errors_sum.item(),
-                acc=(correct_sum/total).item(),
+                acc=(true_postives_sum/total).item(),
                 iou=(iou_sum/total).item()
             )
             progress_bar.update()
 
 
-    acc = correct / total
+    acc = true_postives_sum / total
     iou = iou_sum / total
 
-    return acc, iou
+    return acc.item(), iou.item(), true_postives_sum.item(), false_positives_sum.item(), false_negative_sum.item()
+
 
 # define model, loss function and optimizer
 num_classes = len(set(dataset.labels))
@@ -299,9 +293,9 @@ model = models.detection.retinanet_resnet50_fpn_v2(
 # 95% val
 # model_name='model-9-0.862.pth'
 # 96% val
-# model_name='model-12-0.865.pth'
+model_name='model-12-0.865.pth'
 # model_name='model-17-0.917.pth'
-model_name='model-18-0.933.pth'
+# model_name='model-18-0.933.pth'
 
 model.load_state_dict(torch.load('weights/' + model_name))
 model = model.to(device)
@@ -309,10 +303,14 @@ model = model.to(device)
 # Validation
 model.eval()
 with torch.no_grad():
-    val_acc, val_iou = compute_acc_iou(model, dataloader)
+    val_acc, val_iou, tp, fp, fn = compute_acc_iou(model, dataloader)
 
 print(
-    model_name,
-    'val_acc', val_acc, 
-    'val_iou', val_iou
+    model_name, {
+        'val_acc': val_acc, 
+        'val_iou': val_iou,
+        'tp': tp,
+        'fp': fp,
+        'fn': fn
+    }
 )
