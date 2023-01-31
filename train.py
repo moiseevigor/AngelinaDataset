@@ -20,9 +20,9 @@ parser = argparse.ArgumentParser(description='Load model weights')
 parser.add_argument('--weights', required=False, help='Path to the model weights file')
 args = parser.parse_args()
 
-num_experiment = 18
+num_experiment = 19
 # Create a SummaryWriter object
-writer = SummaryWriter(f'/app/experiments/retinanet/adamw/exp-{num_experiment}-resnet50')
+writer = SummaryWriter(f'/app/experiments/retinanet/adamw/exp-{num_experiment}-resnet50-onecycle-max_lr-1e-4')
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -146,7 +146,7 @@ train_dataset = RetinaNetDataset(train_annotation_files, transform=transform, la
 train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=2, pin_memory=True, collate_fn=labelbox_collate_fn)
 
 # define the train_dataloader
-test_annotation_files = []
+val_annotation_files = []
 for filepath in [
     '/app/books/val.txt',
     # '/app/not_braille/train.txt',
@@ -154,10 +154,10 @@ for filepath in [
     # '/app/uploaded/test2.txt',
 ]:
     with open(filepath, 'r') as file:
-        test_annotation_files.extend([os.path.join(os.path.dirname(filepath), line.strip().replace('.jpg', '.json')) for line in file.readlines()])
+        val_annotation_files.extend([os.path.join(os.path.dirname(filepath), line.strip().replace('.jpg', '.json')) for line in file.readlines()])
 
-test_dataset = RetinaNetDataset(test_annotation_files, transform=transform, labels=dataset.labels)
-test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=True, num_workers=2, pin_memory=True, collate_fn=labelbox_collate_fn)
+val_dataset = RetinaNetDataset(val_annotation_files, transform=transform, labels=dataset.labels)
+val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=True, num_workers=2, pin_memory=True, collate_fn=labelbox_collate_fn)
 
 # for i, data in enumerate(train_dataloader):
 #     print(data)
@@ -201,40 +201,29 @@ test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=True, num_worke
 #     plt.show()
 # exit()
 
-# def bbox_iou(predicted_bboxes, target_bboxes):
-#     """
-#     Computes IoU between two bounding boxes
-#     """
-#     pred_x1, pred_y1, pred_x2, pred_y2 = torch.unbind(predicted_bboxes, dim=1)
-#     target_x1, target_y1, target_x2, target_y2 = torch.unbind(target_bboxes, dim=0)
-
-#     # width and height of the intersection box
-#     w_intsec = torch.min(pred_x2, target_x2) - torch.max(pred_x1, target_x1)
-#     h_intsec = torch.min(pred_y2, target_y2) - torch.max(pred_y1, target_y1)
-#     # Clamp negative values to zero
-#     w_intsec = torch.clamp(w_intsec, min=0)
-#     h_intsec = torch.clamp(h_intsec, min=0)
-
-#     # area of intersection box
-#     area_int = w_intsec * h_intsec
-#     # area of predicted and target boxes
-#     area_pred = (pred_x2 - pred_x1) * (pred_y2 - pred_y1)
-#     area_target = (target_x2 - target_x1) * (target_y2 - target_y1)
-
-#     # Compute IoU
-#     return area_int / (area_pred + area_target - area_int)
-
-def compute_acc_iou(model, dataloader, threshold=0.5):
+def compute_acc_iou(model, dataloader, threshold=0.45):
     """
     Computes accuracy and average IoU
+        True Positive (TP): model correctly detects and classifies a braille char as a char.
+        False Positive (FP): model detects an object as a braille char, even though it is not a braille char.
+        False Negative (FN): model fails to detect a braille char in an image, even though a braille char is present.
+        True Negative (TN): model correctly detects that there is no braille char in an image, and classifies it as negative.
     """
-    model.eval()
-    correct = 0
     total = 0
     iou_sum = 0
+    errors_sum = 0
+
+    # correctly detected
+    true_postives_sum = 0
+    # misses
+    false_negative_sum = 0
+    # wrongly classified
+    false_positives_sum = 0
+
     with torch.no_grad():
         for iter, data in enumerate(dataloader):
             images, targets = data
+            # filename = targets[0]['filename']
 
             for i, im in enumerate(images):
                 images[i] = images[i].to(device)
@@ -248,23 +237,37 @@ def compute_acc_iou(model, dataloader, threshold=0.5):
             predicted_labels = outputs[0]['labels']
             
             total += len(targets[0]['boxes'])
-            for i in range(len(targets[0]['boxes'])):
-                # find the best candidate for targets['boxes'] among predicted_bboxes
-                # iou = bbox_iou(predicted_bboxes, targets[0]['boxes'][i])
-                iou = ops.boxes.box_iou(predicted_bboxes, targets[0]['boxes'][i].view(1, -1))
-                if len(iou) <= 0: continue
 
-                best_candidate_index = iou.argmax()
-                best_candidate_label = predicted_labels[best_candidate_index]
-                best_candidate_score = predicted_scores[best_candidate_index]
-                iou_sum += iou.max()
-                if iou.max() > threshold and best_candidate_label == targets[0]['labels'][i] and best_candidate_score > threshold:
-                    correct += 1
+            iou = ops.boxes.box_iou(targets[0]['boxes'], predicted_bboxes)
+            iou_val, best_candidate_index = iou.max(1)
+            iou_sum += iou_val.sum()
+            
+            true_postives = ((iou_val>threshold)*(targets[0]['labels']==predicted_labels[best_candidate_index])*(predicted_scores[best_candidate_index]>threshold))
+            false_positives = ((iou_val>0)*(targets[0]['labels']!=predicted_labels[best_candidate_index]))
+            false_negative = (iou_val==0)
+            errors = false_positives+false_negative
 
-    acc = correct / total
+            true_postives_sum += true_postives.sum()
+            false_positives_sum += false_positives.sum()
+            false_negative_sum += false_negative.sum()
+            errors_sum += errors.sum()
+
+    acc = true_postives_sum / total
     iou = iou_sum / total
+    precision = true_postives_sum/(true_postives_sum+false_positives_sum)
+    recall = true_postives_sum/(true_postives_sum+false_negative_sum)
+    f1 = true_postives_sum/(true_postives_sum+1/2*(false_positives_sum+false_negative_sum))
 
-    return acc, iou
+    return {
+        "acc": acc.item(), 
+        "iou": iou.item(), 
+        "tp": true_postives_sum.item(), 
+        "fp": false_positives_sum.item(), 
+        "fn": false_negative_sum.item(), 
+        "precision": precision.item(), 
+        "recall": recall.item(), 
+        "f1": f1.item()
+    }
 
 # define model, loss function and optimizer
 num_classes = len(set(train_dataset.labels))
@@ -280,13 +283,13 @@ if args.weights is not None:
 
 model = model.to(device)
 
-max_lr=5e-5
+max_lr=1e-4
 # optimizer = Adam(model.parameters(), lr=max_lr)
 optimizer = torch.optim.AdamW(model.parameters(), lr=max_lr, weight_decay=0.0001)
 # optimizer = torch.optim.SGD(model.parameters(), lr=max_lr, momentum=0.5, weight_decay=1e-4)
 
 # define the number of training steps
-num_epochs = 50
+num_epochs = 10
 
 # define validation accuracy
 val_accuracy = 0 
@@ -349,28 +352,41 @@ for epoch in range(num_epochs):
     # Validation
     model.eval()
     with torch.no_grad():
-        train_acc, train_iou = compute_acc_iou(model, train_dataloader)
-        val_acc, val_iou = compute_acc_iou(model, test_dataloader)
+        train_metrics = compute_acc_iou(model, train_dataloader)
+        val_metrics = compute_acc_iou(model, val_dataloader)
 
     # Update the progress bar
     progress_bar.set_postfix(
         train_loss=losses.item(), 
         lr=lr[0],
-        train_acc=train_acc, 
-        train_iou=train_iou.item(),
-        val_acc=val_acc, 
-        val_iou=val_iou.item()
+        train_metrics=train_metrics,
+        val_metrics=val_metrics,
     )
+
     # Update tensorboard summary
     writer.add_scalar('Loss/train', losses.item(), epoch)
-    writer.add_scalar('Accuracy/train', train_acc, epoch)
-    writer.add_scalar('Accuracy/val', val_acc, epoch)
-    writer.add_scalar('IoU/train', train_iou, epoch)
-    writer.add_scalar('IoU/val', val_iou, epoch)
+    writer.add_scalar('Accuracy/train', train_metrics["acc"], epoch)
+    writer.add_scalar('Accuracy/val', val_metrics["acc"], epoch)
+    writer.add_scalar('IoU/train', train_metrics["iou"], epoch)
+    writer.add_scalar('IoU/val', val_metrics["iou"], epoch)
+
+    writer.add_scalar('Metrics/train_tp', train_metrics["tp"], epoch)
+    writer.add_scalar('Metrics/train_fp', train_metrics["fp"], epoch)
+    writer.add_scalar('Metrics/train_fn', train_metrics["fn"], epoch)
+    writer.add_scalar('Metrics/train_precision', train_metrics["precision"], epoch)
+    writer.add_scalar('Metrics/train_recall', train_metrics["recall"], epoch)
+    writer.add_scalar('Metrics/train_f1', train_metrics["f1"], epoch)
+
+    writer.add_scalar('Metrics/val_tp', val_metrics["tp"], epoch)
+    writer.add_scalar('Metrics/val_fp', val_metrics["fp"], epoch)
+    writer.add_scalar('Metrics/val_fn', val_metrics["fn"], epoch)
+    writer.add_scalar('Metrics/val_precision', val_metrics["precision"], epoch)
+    writer.add_scalar('Metrics/val_recall', val_metrics["recall"], epoch)
+    writer.add_scalar('Metrics/val_f1', val_metrics["f1"], epoch)
 
     # save best checkpoint the model
-    if val_accuracy < val_acc:
-        torch.save(model.state_dict(), f'weights/model-{num_experiment}-{val_acc:.3f}.pth')
+    if val_accuracy < val_metrics["acc"]:
+        torch.save(model.state_dict(), f'weights/model-{num_experiment}-{val_metrics["acc"]:.3f}.pth')
         if os.path.exists(f'weights/model-{num_experiment}-{val_accuracy:.3f}.pth'):
             os.remove(f'weights/model-{num_experiment}-{val_accuracy:.3f}.pth')     
-        val_accuracy = val_acc
+        val_accuracy = val_metrics["acc"]

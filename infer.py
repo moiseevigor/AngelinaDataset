@@ -21,13 +21,13 @@ import pprint
 # image = Image.open("/app/DSBI/data/The Second Volume of Ninth Grade Chinese Book 1/SVNGCB1+1.jpg")
 # image = Image.open("/app/DSBI/data/The Second Volume of Ninth Grade Chinese Book 1/SVNGCB1+2.jpg")
 # image = Image.open("/app/test/IMG_1969.jpg")
-# image = Image.open("/app/test/pagina_braille_fotografata_lowres.jpg")
+image = Image.open("/app/test/pagina_braille_fotografata_lowres.jpg")
 # image = Image.open("/app/test/pagina_braille_scannerizzata_1.jpg")
 # image = Image.open("/app/test/pagina_braille_scannerizzata_2.jpeg")
 # image = Image.open("/app/test/braille.png")
 # image = Image.open("/app/test/chemistry.webp")
 # image = Image.open("/app/test/text-1.jpeg")
-image = Image.open("/app/test/braille-outdoor.jpg")
+# image = Image.open("/app/test/braille-outdoor.jpg")
 
 
 # model 1, 83
@@ -133,8 +133,9 @@ def russian_to_italian(text):
 
 
 model = retinanet_resnet50_fpn_v2(num_classes=127, score_thresh=0.45, detections_per_img=840)
-model.load_state_dict(torch.load('weights/model-9-0.862.pth'))
-# model.load_state_dict(torch.load('weights/model-12-0.865.pth'))
+# model.load_state_dict(torch.load('weights/model-9-0.862.pth'))
+model.load_state_dict(torch.load('weights/model-12-0.865.pth'))
+# model.load_state_dict(torch.load('weights/model-19-0.937.pth'))
 
 # Put the model in inference mode
 model.eval()
