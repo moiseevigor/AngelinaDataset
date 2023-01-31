@@ -14,13 +14,14 @@ from torch.nn import BCELoss
 from torchvision import transforms
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
+from codes import get_code
 
 # Define the argument parser
 parser = argparse.ArgumentParser(description='Load model weights')
 parser.add_argument('--weights', required=False, help='Path to the model weights file')
 args = parser.parse_args()
 
-num_experiment = 19
+num_experiment = 21
 # Create a SummaryWriter object
 writer = SummaryWriter(f'/app/experiments/retinanet/adamw/exp-{num_experiment}-resnet50-onecycle-max_lr-1e-4')
 
@@ -32,7 +33,7 @@ class RetinaNetDataset(Dataset):
         self.train_annotation_files = train_annotation_files
         self.annotations = []
         self.set_labels = labels is not None
-        self.labels = ['background']
+        self.labels = []
         if self.set_labels:
             self.labels = copy.deepcopy(labels)
         
@@ -45,8 +46,8 @@ class RetinaNetDataset(Dataset):
                 # Extract label
                 if not self.set_labels:
                     for shape in annotation["shapes"]:
-                        self.labels.append(shape["label"])
-
+                        self.labels.append(get_code(shape["label"]))
+        
         self.label_to_int = {label: i for i, label in enumerate(sorted(set(self.labels)))}
         self.int_to_label = {i: label for label, i in self.label_to_int.items()}
 
@@ -62,7 +63,7 @@ class RetinaNetDataset(Dataset):
         # Iterate through each shape in the annotation
         for shape in annotation["shapes"]:
             # Extract label
-            labels.append(self.label_to_int[shape["label"]])
+            labels.append(self.label_to_int[get_code(shape["label"])])
 
             # Extract x, y coordinates of the bounding box
             x1, y1 = shape["points"][0]
@@ -104,8 +105,9 @@ for filepath in [
         annotation_files.extend([os.path.join(os.path.dirname(filepath), line.strip().replace('.jpg', '.json')) for line in file.readlines()])
 
 dataset = RetinaNetDataset(annotation_files)
-print('label_to_int:', dataset.label_to_int)
-print('int_to_label:', dataset.int_to_label)
+print('labels:', sorted(set(dataset.labels)), '\n')
+print('label_to_int:', dataset.label_to_int, '\n')
+print('int_to_label:', dataset.int_to_label, '\n')
 
 train_annotation_files = []
 for filepath in [
@@ -390,3 +392,9 @@ for epoch in range(num_epochs):
         if os.path.exists(f'weights/model-{num_experiment}-{val_accuracy:.3f}.pth'):
             os.remove(f'weights/model-{num_experiment}-{val_accuracy:.3f}.pth')     
         val_accuracy = val_metrics["acc"]
+
+        print(
+           "train_loss:", losses.item(), 
+           "train_metrics:", train_metrics,
+           "val_metrics:", val_metrics,
+        )

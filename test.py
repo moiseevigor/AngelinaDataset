@@ -105,13 +105,11 @@ def labelbox_collate_fn(batch):
     targets = [item[1] for item in batch]
     return images, targets
 
-def plot_image(ax, plt, prediction, is_gt=True):
+def plot_image(ax, plt, prediction, color='g', is_gt=True):
     # Get the boxes, labels, and scores from the prediction results
     boxes = prediction["boxes"]
     labels = prediction["labels"]
     scores = prediction["scores"] if "scores" in prediction else torch.ones(labels.size())
-
-    edge_color = 'lightgreen' if is_gt else 'r'
 
     # Iterate over the boxes, labels, and scores
     for box, label, score in zip(boxes, labels, scores):
@@ -119,31 +117,30 @@ def plot_image(ax, plt, prediction, is_gt=True):
         xmin, ymin, xmax, ymax = box.detach().cpu().numpy()
 
         # Create a rectangle patch
-        rect = Rectangle((xmin, ymin), xmax - xmin, ymax - ymin, linewidth=1, edgecolor=edge_color, facecolor='none')
+        rect = Rectangle((xmin, ymin), xmax - xmin, ymax - ymin, linewidth=1, edgecolor=color, facecolor='none')
 
         # Add the patch to the axes
         ax.add_patch(rect)
 
         label_text = int_to_label[int(label.detach().cpu().numpy())]
+        label_text = f"{label_text}: {score:0.2f}" if not is_gt else f"{label_text}"
+        dy = ymin-5 if is_gt else ymax+10
 
         # Add the label and score as text
-        if is_gt:
-            plt.text(xmin, ymin-5, f"{label_text}", fontsize=12, color=edge_color)
-        else:
-            plt.text(xmin, ymax+10, f"{label_text}: {score:0.2f}", fontsize=12, color=edge_color)
-            # plt.text(xmin, ymax+10, f"{label_text}", fontsize=12, color=edge_color)
+        # plt.text(xmin, ymax+dy, , fontsize=12, color=color)
+        plt.text(xmin, dy, f"{label_text}", fontsize=12, color=color)
 
     # plt.show()
 
 
 annotation_files = []
 for filepath in [
-    # '/app/books/train.txt',
+    '/app/books/train.txt',
     # '/app/not_braille/train.txt',
-    # '/app/handwritten/train.txt',
-    # '/app/uploaded/test2.txt',
-    '/app/books/val.txt',
-    '/app/handwritten/val.txt',
+    '/app/handwritten/train.txt',
+    '/app/uploaded/test2.txt',
+    # '/app/books/val.txt',
+    # '/app/handwritten/val.txt',
 ]:
     with open(filepath, 'r') as file:
         annotation_files.extend([os.path.join(os.path.dirname(filepath), line.strip().replace('.jpg', '.json')) for line in file.readlines()])
@@ -239,7 +236,7 @@ def compute_acc_iou(model, dataloader, threshold=0.45):
             false_negative_sum += false_negative.sum()
             errors_sum += errors.sum()
 
-            if errors.sum()>1000:
+            if errors.sum()>0:
                 # Reshaping the mean and std
                 image = images[0].detach().cpu()
                 image = image * std + mean
@@ -250,9 +247,11 @@ def compute_acc_iou(model, dataloader, threshold=0.45):
 
                 print("filename", filename)
 
-                plot_image(ax, plt, targets[0], is_gt=True)
-                plot_image(ax, plt, {'boxes': predicted_bboxes,'labels': predicted_labels,'scores': predicted_scores,}, is_gt=False)
-                plot_image(ax, plt, {'boxes': targets[0]['boxes'][false_negative],'labels': targets[0]['labels'][false_negative]}, is_gt=True)
+                plot_image(ax, plt, targets[0], color='lightgreen', is_gt=True)
+                # plot_image(ax, plt, {'boxes': predicted_bboxes,'labels': predicted_labels,'scores': predicted_scores,}, color='r', is_gt=False)
+                plot_image(ax, plt, {'boxes': targets[0]['boxes'][false_negative],'labels': targets[0]['labels'][false_negative]}, color='yellow', is_gt=True)
+                idx = best_candidate_index[false_positives]
+                plot_image(ax, plt, {'boxes': predicted_bboxes[idx],'labels': predicted_labels[idx],'scores': predicted_scores[idx]}, color='r', is_gt=False)
                 
                 plt.show()
 
@@ -296,6 +295,7 @@ model = models.detection.retinanet_resnet50_fpn_v2(
 model_name='model-12-0.865.pth'
 # model_name='model-17-0.917.pth'
 # model_name='model-18-0.933.pth'
+# model_name='model-20-0.916.pth'
 
 model.load_state_dict(torch.load('weights/' + model_name))
 model = model.to(device)

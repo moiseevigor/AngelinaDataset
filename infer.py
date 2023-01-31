@@ -134,8 +134,9 @@ def russian_to_italian(text):
 
 model = retinanet_resnet50_fpn_v2(num_classes=127, score_thresh=0.45, detections_per_img=840)
 # model.load_state_dict(torch.load('weights/model-9-0.862.pth'))
-model.load_state_dict(torch.load('weights/model-12-0.865.pth'))
+# model.load_state_dict(torch.load('weights/model-12-0.865.pth'))
 # model.load_state_dict(torch.load('weights/model-19-0.937.pth'))
+model.load_state_dict(torch.load('weights/model-20-0.916.pth'))
 
 # Put the model in inference mode
 model.eval()
